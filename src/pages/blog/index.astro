@@ -1,0 +1,22 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const B = import.meta.env.BASE_URL;
+const posts = (await getCollection('posts'))
+  .filter((p) => !p.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+<BaseLayout title="博客" description="文章列表">
+  <h1>博客</h1>
+  <p class="section-sub">记录学习、生活与一些想法。</p>
+  <ul class="post-list">
+    {posts.map((p) => (
+      <li>
+        <a href={`${B}blog/${p.id}/`}>{p.data.title}</a>
+        <div class="post-meta">{p.data.pubDate.toISOString().slice(0, 10)} · {p.data.tags.join(' / ')}</div>
+        <p style="margin:6px 0 0;color:var(--muted)">{p.data.description}</p>
+      </li>
+    ))}
+  </ul>
+</BaseLayout>

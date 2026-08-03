@@ -1,0 +1,46 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const B = import.meta.env.BASE_URL;
+const posts = (await getCollection('posts'))
+  .filter((p) => !p.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, 3);
+
+const interests = [
+  { emoji: '📷', title: '摄影', desc: '用光影记录生活' },
+  { emoji: '📚', title: '读书', desc: '每月一本好书' },
+  { emoji: '🧭', title: '旅行', desc: '走过的路都是风景' },
+  { emoji: '💻', title: '代码', desc: '折腾有趣的小项目' },
+];
+---
+<BaseLayout>
+  <section class="hero">
+    <h1>你好，我是迩迩 👋</h1>
+    <p>这里是我用 Astro 搭的个人小站，写写博客、分享点兴趣爱好。欢迎随便逛逛。</p>
+  </section>
+
+  <h2 class="section-title">最近文章</h2>
+  <ul class="post-list">
+    {posts.map((p) => (
+      <li>
+        <a href={`${B}blog/${p.id}/`}>{p.data.title}</a>
+        <div class="post-meta">{p.data.pubDate.toISOString().slice(0, 10)} · {p.data.tags.join(' / ')}</div>
+      </li>
+    ))}
+  </ul>
+  <p><a href={`${B}blog/`}>查看全部文章 →</a></p>
+
+  <h2 class="section-title">我的兴趣</h2>
+  <p class="section-sub">工作之外，这些让我开心。</p>
+  <div class="grid">
+    {interests.map((i) => (
+      <a class="card" href={`${B}interests/`} style="display:block">
+        <div style="font-size:30px">{i.emoji}</div>
+        <h3>{i.title}</h3>
+        <p>{i.desc}</p>
+      </a>
+    ))}
+  </div>
+</BaseLayout>

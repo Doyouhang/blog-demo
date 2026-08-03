@@ -1,0 +1,28 @@
+name: Deploy to Gitee Pages
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - name: Push to Gitee Pages branch
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_REPO: Doyouhang/blog-demo   # 你的 Gitee 仓库
+        run: |
+          cd dist
+          git init -q
+          git config user.email "ci@local"
+          git config user.name "CI Bot"
+          git add -A
+          git commit -q -m "deploy: $(date +%F_%T)"
+          git push -f "https://${GITEE_TOKEN}@gitee.com/${GITEE_REPO}.git" HEAD:gitee-pages
