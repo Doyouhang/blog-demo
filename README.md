@@ -1,13 +1,15 @@
-# 迩迩的小站（Astro + Gitee Pages）
+# 迩迩的小站（Astro + GitHub Pages）
 
-一个用 [Astro](https://astro.build) 搭建的个人博客 + 兴趣分享页，**静态托管在 Gitee Pages，完全免费**。
+一个用 [Astro](https://astro.build) 搭建的个人博客 + 兴趣分享页，**静态托管在 GitHub Pages，完全免费**。
+
+> 注：Gitee Pages 已于 2025-06-06 官方下线，本项目改用 GitHub Pages。
 
 ## 本地开发
 
 ```bash
 npm install
 npm run dev      # 本地预览，默认 http://localhost:4321
-npm run build    # 生成静态站点到 dist/
+npm run build    # 生成静态站点到 dist/（项目页会自动带 /blog-demo/ 前缀）
 npm run preview  # 预览构建产物
 ```
 
@@ -39,39 +41,39 @@ draft: false
 正文用 Markdown 写……
 ```
 
-## 部署到 Gitee Pages
+## 部署到 GitHub Pages
 
-### 方式一：手动部署（最简单，推荐先试）
+仓库 `blog-demo` 是**项目页**，线上地址为 `https://doyouhang.github.io/blog-demo/`。
+配置里已默认 `SITE_BASE=/blog-demo/`，无需手动设置。
 
-1. 在 Gitee 新建仓库（例如 `blog-demo`）。
-2. 本地构建：`npm run build`，得到 `dist/`。
-3. 把 `dist/` 里的文件推到仓库的一个分支（建议 `gitee-pages`）：
+### 方式一：GitHub Actions 自动部署（推荐）
+
+1. 在 GitHub 新建仓库 `blog-demo`（**不要**勾选初始化 README/LICENSE）。
+2. 把本地仓库推到 GitHub（SSH 需先在 GitHub 添加你的公钥 `~/.ssh/id_ed25519.pub`）：
    ```bash
-   cd dist
-   git init -q && git add -A && git commit -q -m "deploy"
-   git push -f git@gitee.com:Doyouhang/blog-demo.git HEAD:gitee-pages
+   git remote add github git@github.com:Doyouhang/blog-demo.git
+   git push -u github main
    ```
-4. 仓库 → **服务** → **Gitee Pages** → 选择 `gitee-pages` 分支 → 部署。
-5. 访问 `https://Doyouhang.gitee.io/blog-demo/`（项目页）或 `https://Doyouhang.gitee.io/`（用户页）。
+3. 仓库 → **Settings → Pages** → Source 选 **GitHub Actions**。
+4. 等 Actions 跑完（几分钟），访问 `https://doyouhang.github.io/blog-demo/`。
 
-> 注意 base 路径：
-> - **用户页**（仓库名 `<用户名>.gitee.io`）：保持默认，`base: '/'`。
-> - **项目页**（普通仓库名）：构建前设置 `GITEE_BASE=/仓库名/`，例如 `GITEE_BASE=/blog-demo/ npm run build`。
+以后每次 `git push` 到 `main` 都会自动重新部署。
 
-### 方式二：一键脚本 `deploy.sh`
+### 方式二：手动部署（兜底，不依赖 Actions）
 
-已内置 `deploy.sh`，推到 Gitee 的 `gitee-pages` 分支：
+把构建产物推到 `gh-pages` 分支，再到 Settings → Pages 选该分支：
 ```bash
-GITEE_REMOTE=git@gitee.com:Doyouhang/blog-demo.git ./deploy.sh
+GH_REMOTE=git@github.com:Doyouhang/blog-demo.git ./deploy.sh
 ```
 
-### 方式三：GitHub Actions 自动部署（可选）
+## 换成用户页（可选）
 
-如果你把仓库镜像到 GitHub，可使用 `.github/workflows/deploy.yml`：
-push 到 `main` 后自动构建并推到 Gitee 的 `gitee-pages` 分支。
-需要在 GitHub 仓库 **Settings → Secrets** 里配置 `GITEE_TOKEN`（Gitee 私人令牌，有推送权限）。
+若想要更干净的地址 `https://doyouhang.github.io/`（不带 `/blog-demo/`）：
+1. 新建仓库，名称必须为 `doyouhang.github.io`。
+2. 把 `astro.config.mjs` 里的 `SITE_BASE` 默认值改为 `/`（构建时不再带前缀）。
+3. 部署方式同上。
 
 ## 绑定自己的域名（可选）
 
-- Gitee Pages 绑定自定义域名需开通 **Gitee 会员**（约 ¥99/年）。
-- 国内规则下自定义域名需完成 **ICP 备案**（使用 `xxx.gitee.io` 免费子域名则无需备案）。
+GitHub Pages 可免费绑定自定义域名（需在域名服务商做好 CNAME 解析）。
+国内规则下自定义域名需完成 **ICP 备案**；使用 `*.github.io` 免费子域名无需备案。
