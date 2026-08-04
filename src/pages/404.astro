@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+const B = import.meta.env.BASE_URL;
+---
+<BaseLayout title="页面不存在" description="你要找的页面不存在">
+  <section class="hero not-found">
+    <h1>404</h1>
+    <p>哎呀，这个页面走丢了。</p>
+    <p style="margin-top:18px">
+      <a href={`${B}`}>← 回到首页</a>
+      <span style="color:var(--muted);margin:0 10px">·</span>
+      <a href={`${B}blog/`}>看看博客</a>
+    </p>
+  </section>
+</BaseLayout>

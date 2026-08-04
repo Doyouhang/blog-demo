@@ -3,7 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('posts');
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
   return posts.map((post) => ({
     params: { slug: post.id },
     props: { post },
@@ -13,13 +13,46 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const { Content } = await render(post);
 const B = import.meta.env.BASE_URL;
+
+const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+const index = posts.findIndex((p) => p.id === post.id);
+const newer = index > 0 ? posts[index - 1] : undefined;
+const older = index < posts.length - 1 ? posts[index + 1] : undefined;
 ---
 <BaseLayout title={post.data.title} description={post.data.description}>
   <article>
     <h1>{post.data.title}</h1>
     <p class="date">{post.data.pubDate.toISOString().slice(0, 10)}</p>
-    <div>{post.data.tags.map((t) => <span class="tag">{t}</span>)}</div>
+    <div>
+      {post.data.tags.map((t) => (
+        <a class="tag" href={`${B}blog/tags/${encodeURIComponent(t)}/`}>{t}</a>
+      ))}
+    </div>
     <div class="prose" style="margin-top:18px"><Content /></div>
-    <p style="margin-top:40px"><a href={`${B}blog/`}>← 返回文章列表</a></p>
+
+    {(newer || older) && (
+      <nav class="post-nav">
+        <div>
+          {newer && (
+            <>
+              <span class="post-nav-label">← 上一篇</span>
+              <a href={`${B}blog/${newer.id}/`}>{newer.data.title}</a>
+            </>
+          )}
+        </div>
+        <div class="post-nav-next">
+          {older && (
+            <>
+              <span class="post-nav-label">下一篇 →</span>
+              <a href={`${B}blog/${older.id}/`}>{older.data.title}</a>
+            </>
+          )}
+        </div>
+      </nav>
+    )}
+
+    <p style="margin-top:28px"><a href={`${B}blog/`}>← 返回文章列表</a></p>
   </article>
 </BaseLayout>

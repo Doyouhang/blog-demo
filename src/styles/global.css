@@ -74,6 +74,14 @@ article h1 { font-size: 30px; margin-bottom: 6px; }
 .date { color: var(--muted); font-size: 14px; margin-top: 0; }
 .prose img { max-width: 100%; border-radius: 10px; }
 
+.post-nav {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);
+}
+.post-nav-label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.post-nav a { font-weight: 600; }
+.post-nav-next { text-align: right; }
+
 footer.site {
   border-top: 1px solid var(--border); color: var(--muted);
   font-size: 14px; text-align: center; padding: 24px 0;
