@@ -1,0 +1,54 @@
+---
+import InterestLayout from '../../../layouts/InterestLayout.astro';
+---
+<InterestLayout emoji="💻" title="代码" description="一个迷你 JavaScript 运行器：改改代码，点「运行」看输出。">
+  <div class="demo-card">
+    <label class="demo-label" for="code">JavaScript 代码</label>
+    <textarea id="code" spellcheck="false"></textarea>
+    <div class="demo-row">
+      <button id="run" class="demo-btn">▶ 运行</button>
+      <button id="clear" class="demo-btn ghost">清空输出</button>
+    </div>
+    <label class="demo-label" for="output">输出</label>
+    <pre id="output" class="demo-console">// 运行结果会显示在这里</pre>
+  </div>
+
+  <script>
+    const code = document.getElementById('code') as HTMLTextAreaElement;
+    const output = document.getElementById('output') as HTMLPreElement;
+    const runBtn = document.getElementById('run') as HTMLButtonElement;
+    const clearBtn = document.getElementById('clear') as HTMLButtonElement;
+
+    code.value = [
+      '// 试试改一改，然后点「运行」',
+      'const name = "迩迩";',
+      'for (let i = 1; i <= 3; i++) {',
+      '  console.log(name + " 第 " + i + " 次问好 👋");',
+      '}',
+      'console.log("1 + 2 =", 1 + 2);',
+    ].join('\n');
+
+    runBtn.addEventListener('click', () => {
+      const lines = [];
+      const originalLog = console.log;
+      console.log = (...args) => {
+        lines.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+      };
+      try {
+        new Function(code.value)();
+        output.textContent = lines.length ? lines.join('\n') : '（没有输出）';
+        output.classList.remove('err');
+      } catch (e) {
+        output.textContent = '出错了：' + e.message;
+        output.classList.add('err');
+      } finally {
+        console.log = originalLog;
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      output.textContent = '// 运行结果会显示在这里';
+      output.classList.remove('err');
+    });
+  </script>
+</InterestLayout>

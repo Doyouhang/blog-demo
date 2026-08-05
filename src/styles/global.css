@@ -86,3 +86,60 @@ footer.site {
   border-top: 1px solid var(--border); color: var(--muted);
   font-size: 14px; text-align: center; padding: 24px 0;
 }
+
+/* ===== 兴趣卡片（可点击） ===== */
+.card.link-card {
+  display: block; color: inherit; cursor: pointer;
+}
+.card.link-card:hover { text-decoration: none; border-color: var(--accent); }
+.card-cta { margin-top: 14px; color: var(--accent); font-size: 13px; font-weight: 600; }
+
+/* ===== 兴趣 demo 公共组件 ===== */
+.back-link { margin: 0 0 14px; }
+.demo-head { display: flex; align-items: center; gap: 16px; margin: 4px 0 22px; }
+.demo-head-emoji { font-size: 44px; line-height: 1; }
+.demo-head h1 { margin: 0; font-size: 26px; }
+.demo-head-desc { margin: 4px 0 0; color: var(--muted); }
+
+.demo-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px;
+}
+.demo-label { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin: 16px 0 6px; }
+.demo-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+.demo-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.demo-btn:hover { filter: brightness(1.08); }
+.demo-btn.ghost { background: #fff; color: var(--accent); border: 1px solid var(--border); }
+.demo-btn.ghost:hover { background: #eef3ff; }
+.demo-console {
+  background: #1e293b; color: #e2e8f0; border-radius: 10px; padding: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+  min-height: 54px; white-space: pre-wrap; overflow-x: auto; margin: 0;
+}
+.demo-console.err { color: #fca5a5; }
+.demo-card textarea {
+  width: 100%; min-height: 150px; box-sizing: border-box;
+  background: #0f172a; color: #e2e8f0; border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px; resize: vertical; line-height: 1.6;
+}
+.demo-card input[type="number"], .demo-card select, .demo-card input[type="text"] {
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px;
+  font-size: 15px; font-family: inherit; color: var(--fg); background: #fff;
+}
+.demo-card input[type="range"] { accent-color: var(--accent); width: 100%; }
+.chip {
+  display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--border);
+  border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer; color: var(--fg);
+  font-family: inherit;
+}
+.chip:hover { border-color: var(--accent); }
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.demo-result {
+  background: #eef3ff; border: 1px solid #d7e3ff; border-radius: 12px; padding: 18px;
+  text-align: center; font-size: 16px;
+}

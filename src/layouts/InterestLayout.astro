@@ -1,0 +1,22 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  emoji: string;
+  title: string;
+  description?: string;
+}
+const { emoji, title, description } = Astro.props;
+const B = import.meta.env.BASE_URL;
+---
+<BaseLayout title={`${emoji} ${title}`} description={description ?? `${title}的小 demo`}>
+  <p class="back-link"><a href={`${B}interests/`}>← 返回兴趣列表</a></p>
+  <div class="demo-head">
+    <div class="demo-head-emoji">{emoji}</div>
+    <div>
+      <h1>{title}</h1>
+      {description && <p class="demo-head-desc">{description}</p>}
+    </div>
+  </div>
+  <slot />
+</BaseLayout>

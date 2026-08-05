@@ -1,0 +1,117 @@
+---
+import InterestLayout from '../../../layouts/InterestLayout.astro';
+---
+<InterestLayout emoji="📷" title="摄影" description="给这张「照片」调调色，体验一把后期。拖动滑杆或选个预设。">
+  <div class="demo-card">
+    <div class="photo-frame">
+      <svg id="photo" viewBox="0 0 400 260" role="img" aria-label="示例风景照">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8ec5fc" />
+            <stop offset="100%" stop-color="#f6d5b8" />
+          </linearGradient>
+        </defs>
+        <rect width="400" height="260" fill="url(#sky)" />
+        <circle cx="316" cy="78" r="38" fill="#ffd166" />
+        <polygon points="0,205 115,88 230,205" fill="#7b93b8" />
+        <polygon points="120,205 245,62 400,205" fill="#5b7398" />
+        <polygon points="248,205 338,118 400,205" fill="#435a7d" />
+        <polygon points="150,112 168,132 132,132" fill="#eef3ff" opacity="0.9" />
+        <rect y="205" width="400" height="55" fill="#8fbf7f" />
+        <rect y="205" width="400" height="8" fill="#7aa96c" />
+      </svg>
+    </div>
+
+    <div class="demo-row">
+      <button class="chip active" data-preset="none">原片</button>
+      <button class="chip" data-preset="film">胶片</button>
+      <button class="chip" data-preset="bw">黑白</button>
+      <button class="chip" data-preset="vivid">鲜艳</button>
+    </div>
+
+    <label class="demo-label" for="brightness">亮度 <span id="v-brightness">100</span>%</label>
+    <input type="range" id="brightness" min="50" max="150" value="100" />
+    <label class="demo-label" for="contrast">对比度 <span id="v-contrast">100</span>%</label>
+    <input type="range" id="contrast" min="50" max="150" value="100" />
+    <label class="demo-label" for="saturate">饱和度 <span id="v-saturate">100</span>%</label>
+    <input type="range" id="saturate" min="0" max="200" value="100" />
+    <label class="demo-label" for="hue">色相 <span id="v-hue">0</span>°</label>
+    <input type="range" id="hue" min="0" max="360" value="0" />
+
+    <div class="demo-row">
+      <button id="reset" class="demo-btn ghost">重置</button>
+      <code id="css-out" class="css-code"></code>
+    </div>
+  </div>
+
+  <style>
+    .photo-frame {
+      border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+      background: #0f172a;
+    }
+    .photo-frame svg { display: block; width: 100%; height: auto; }
+    .css-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px; color: var(--muted); word-break: break-all;
+    }
+  </style>
+
+  <script>
+    const photo = document.getElementById('photo') as SVGElement;
+    const cssOut = document.getElementById('css-out') as HTMLElement;
+    const sliders = {
+      brightness: document.getElementById('brightness') as HTMLInputElement,
+      contrast: document.getElementById('contrast') as HTMLInputElement,
+      saturate: document.getElementById('saturate') as HTMLInputElement,
+      hue: document.getElementById('hue') as HTMLInputElement,
+    };
+    const labels = {
+      brightness: document.getElementById('v-brightness') as HTMLElement,
+      contrast: document.getElementById('v-contrast') as HTMLElement,
+      saturate: document.getElementById('v-saturate') as HTMLElement,
+      hue: document.getElementById('v-hue') as HTMLElement,
+    };
+
+    const presets: Record<string, { brightness: number; contrast: number; saturate: number; hue: number }> = {
+      none: { brightness: 100, contrast: 100, saturate: 100, hue: 0 },
+      film: { brightness: 106, contrast: 88, saturate: 78, hue: 14 },
+      bw: { brightness: 102, contrast: 112, saturate: 0, hue: 0 },
+      vivid: { brightness: 100, contrast: 118, saturate: 165, hue: 0 },
+    };
+
+    function apply() {
+      const b = sliders.brightness.value;
+      const c = sliders.contrast.value;
+      const s = sliders.saturate.value;
+      const h = sliders.hue.value;
+      labels.brightness.textContent = b;
+      labels.contrast.textContent = c;
+      labels.saturate.textContent = s;
+      labels.hue.textContent = h;
+      const filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%) hue-rotate(${h}deg)`;
+      photo.style.filter = filter;
+      cssOut.textContent = 'filter: ' + filter;
+    }
+
+    Object.values(sliders).forEach((s) => s.addEventListener('input', apply));
+
+    document.querySelectorAll<HTMLElement>('.chip[data-preset]').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const p = presets[chip.dataset.preset ?? 'none'];
+        sliders.brightness.value = String(p.brightness);
+        sliders.contrast.value = String(p.contrast);
+        sliders.saturate.value = String(p.saturate);
+        sliders.hue.value = String(p.hue);
+        document.querySelectorAll('.chip[data-preset]').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        apply();
+      });
+    });
+
+    (document.getElementById('reset') as HTMLButtonElement).addEventListener('click', () => {
+      (document.querySelector('.chip[data-preset="none"]') as HTMLElement).click();
+    });
+
+    apply();
+  </script>
+</InterestLayout>

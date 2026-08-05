@@ -1,0 +1,82 @@
+---
+import InterestLayout from '../../../layouts/InterestLayout.astro';
+---
+<InterestLayout emoji="🎧" title="音乐" description="一架迷你钢琴，用 Web Audio 合成。点按琴键听听（手机端也可以）。">
+  <div class="demo-card">
+    <div class="piano">
+      <div class="piano-keys">
+        <button class="key white" data-freq="261.63" aria-label="C4">C</button>
+        <button class="key white" data-freq="293.66" aria-label="D4">D</button>
+        <button class="key white" data-freq="329.63" aria-label="E4">E</button>
+        <button class="key white" data-freq="349.23" aria-label="F4">F</button>
+        <button class="key white" data-freq="392.00" aria-label="G4">G</button>
+        <button class="key white" data-freq="440.00" aria-label="A4">A</button>
+        <button class="key white" data-freq="493.88" aria-label="B4">B</button>
+        <button class="key white" data-freq="523.25" aria-label="C5">C</button>
+
+        <button class="key black" data-freq="277.18" style="left:9%" aria-label="C#4"></button>
+        <button class="key black" data-freq="311.13" style="left:21.5%" aria-label="D#4"></button>
+        <button class="key black" data-freq="369.99" style="left:46.5%" aria-label="F#4"></button>
+        <button class="key black" data-freq="415.30" style="left:59%" aria-label="G#4"></button>
+        <button class="key black" data-freq="466.16" style="left:71.5%" aria-label="A#4"></button>
+      </div>
+    </div>
+    <p class="demo-hint">💡 写代码卡住的时候，随便按几个键，假装自己是后摇乐队的键盘手。</p>
+  </div>
+
+  <style>
+    .piano { overflow-x: auto; }
+    .piano-keys {
+      position: relative; display: flex; height: 190px;
+      min-width: 460px; user-select: none;
+    }
+    .key { border: none; cursor: pointer; font-family: inherit; }
+    .key.white {
+      flex: 1; background: #fff; border: 1px solid var(--border);
+      border-radius: 0 0 8px 8px; color: var(--muted); font-size: 13px;
+      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;
+    }
+    .key.white.active { background: var(--accent); color: #fff; }
+    .key.black {
+      position: absolute; top: 0; width: 7%; height: 60%;
+      background: #1f2328; border-radius: 0 0 6px 6px; z-index: 2;
+    }
+    .key.black.active { background: var(--accent); }
+    .demo-hint { color: var(--muted); font-size: 14px; margin: 16px 0 0; }
+  </style>
+
+  <script>
+    let ctx: AudioContext | null = null;
+
+    function play(freq: number) {
+      if (!ctx) {
+        const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        ctx = new AC();
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const t = ctx.currentTime;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+      osc.start(t);
+      osc.stop(t + 0.95);
+    }
+
+    document.querySelectorAll<HTMLElement>('.key').forEach((key) => {
+      const freq = parseFloat(key.dataset.freq ?? '0');
+      key.addEventListener('pointerdown', () => {
+        play(freq);
+        key.classList.add('active');
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach((evt) =>
+        key.addEventListener(evt, () => key.classList.remove('active'))
+      );
+    });
+  </script>
+</InterestLayout>
