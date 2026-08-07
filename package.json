@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "astro dev",
+    "fetch:stocks": "node scripts/fetch-stocks.mjs",
     "build": "astro build",
     "preview": "astro preview"
   },

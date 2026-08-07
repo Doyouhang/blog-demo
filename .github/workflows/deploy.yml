@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # 交易日北京时间 15:47（UTC 07:47）收盘后重建，刷新股票行情
+  schedule:
+    - cron: '47 7 * * 1-5'
 
 permissions:
   contents: read
@@ -26,6 +29,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Fetch stock quotes
+        run: npm run fetch:stocks
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
         with:

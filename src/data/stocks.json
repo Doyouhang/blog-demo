@@ -1,0 +1,110 @@
+{
+  "source": "eastmoney",
+  "generatedAt": "2026-08-07T14:48:39.823Z",
+  "rows": [
+    {
+      "secid": "1.600519",
+      "code": "600519",
+      "name": "贵州茅台",
+      "ok": true,
+      "price": 1309.22,
+      "change": 0.67,
+      "percent": 0.05,
+      "prevClose": 1308.55,
+      "high": 1315.28,
+      "low": 1301,
+      "currency": "CNY"
+    },
+    {
+      "secid": "1.601318",
+      "code": "601318",
+      "name": "中国平安",
+      "ok": true,
+      "price": 53.38,
+      "change": -0.12,
+      "percent": -0.22,
+      "prevClose": 53.5,
+      "high": 53.68,
+      "low": 53.17,
+      "currency": "CNY"
+    },
+    {
+      "secid": "1.600036",
+      "code": "600036",
+      "name": "招商银行",
+      "ok": true,
+      "price": 38.8,
+      "change": -0.17,
+      "percent": -0.44,
+      "prevClose": 38.97,
+      "high": 39.1,
+      "low": 38.48,
+      "currency": "CNY"
+    },
+    {
+      "secid": "1.600030",
+      "code": "600030",
+      "name": "中信证券",
+      "ok": true,
+      "price": 27.95,
+      "change": 0.03,
+      "percent": 0.11,
+      "prevClose": 27.92,
+      "high": 27.98,
+      "low": 27.77,
+      "currency": "CNY"
+    },
+    {
+      "secid": "0.000858",
+      "code": "000858",
+      "name": "五粮液",
+      "ok": true,
+      "price": 75.11,
+      "change": 0.63,
+      "percent": 0.85,
+      "prevClose": 74.48,
+      "high": 75.2,
+      "low": 74.01,
+      "currency": "CNY"
+    },
+    {
+      "secid": "0.000333",
+      "code": "000333",
+      "name": "美的集团",
+      "ok": true,
+      "price": 83.5,
+      "change": -1.82,
+      "percent": -2.13,
+      "prevClose": 85.32,
+      "high": 85.33,
+      "low": 82.97,
+      "currency": "CNY"
+    },
+    {
+      "secid": "0.002594",
+      "code": "002594",
+      "name": "比亚迪",
+      "ok": true,
+      "price": 90.04,
+      "change": 0.59,
+      "percent": 0.66,
+      "prevClose": 89.45,
+      "high": 90.28,
+      "low": 88.55,
+      "currency": "CNY"
+    },
+    {
+      "secid": "0.300750",
+      "code": "300750",
+      "name": "宁德时代",
+      "ok": true,
+      "price": 388.07,
+      "change": 0.07,
+      "percent": 0.02,
+      "prevClose": 388,
+      "high": 388.88,
+      "low": 384.02,
+      "currency": "CNY"
+    }
+  ]
+}
