@@ -2,62 +2,101 @@
 import InterestLayout from '../../../layouts/InterestLayout.astro';
 import stockData from '../../../data/stocks.json';
 
-const { source, generatedAt, rows } = stockData;
+interface StockRow {
+  secid: string;
+  code: string;
+  name: string;
+  ok: boolean;
+  price?: number;
+  change?: number;
+  percent?: number;
+}
+interface StockData {
+  source: string;
+  generatedAt: string;
+  /** 这次构建有没有真的抓到新数据；抓失败时沿用上一份，这里会是 true */
+  stale?: boolean;
+  rows: StockRow[];
+}
+
+// JSON 的结构由 scripts/fetch-stocks.mjs 决定，这里显式约束一下，避免字段变动时页面静默出错
+const data = stockData as StockData;
+const { source, generatedAt, stale = false, rows } = data;
+
 const isSample = source === 'sample';
 const updated = new Date(generatedAt).toLocaleString('zh-CN', {
   timeZone: 'Asia/Shanghai',
   hour12: false,
 });
+
+// 涨跌方向只算一次，三列共用，避免各列判断标准不一致
+type Direction = 'up' | 'down' | 'flat';
+function directionOf(row: StockRow): Direction {
+  const change = row.change ?? 0;
+  if (change > 0) return 'up';
+  if (change < 0) return 'down';
+  return 'flat';
+}
+const signed = (n: number, dir: Direction, digits = 2) =>
+  (dir === 'up' ? '+' : '') + n.toFixed(digits);
+
+const okRows = rows.filter((r) => r.ok);
 ---
 <InterestLayout emoji="📈" title="股票" description="A股自选股看板：行情在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
   <div class="demo-card">
     <div class="stocks-bar">
-      <span>{rows.filter((r) => r.ok).length} 只自选 · {isSample ? '示例数据' : '东方财富行情'}</span>
+      <span>{okRows.length} 只自选 · {isSample ? '示例数据' : '东方财富行情'}</span>
       <span>更新于 {updated}（北京时间）</span>
     </div>
 
     {isSample && (
       <div class="sample-tip">
-        ⚠️ 当前展示的是示例数据（行情接口还没抓取过）。下一次构建成功后，会自动换成真实行情。
+        ⚠️ 当前展示的是示例数据（行情接口还没成功抓取过）。下一次构建抓到数据后会自动换成真实行情。
+      </div>
+    )}
+
+    {!isSample && stale && (
+      <div class="sample-tip">
+        ⚠️ 最近一次构建没能连上行情接口，下面是上一次抓到的数据（{updated}），不是最新价。
       </div>
     )}
 
     <div class="table-wrap">
       <table class="stocks-table">
+        <caption class="visually-hidden">自选股行情，含最新价、涨跌额和涨跌幅</caption>
         <thead>
           <tr>
-            <th>股票</th>
-            <th class="num">最新价</th>
-            <th class="num">涨跌</th>
-            <th class="num">涨跌幅</th>
+            <th scope="col">股票</th>
+            <th scope="col" class="num">最新价</th>
+            <th scope="col" class="num">涨跌</th>
+            <th scope="col" class="num">涨跌幅</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr>
-              <td>
-                <b>{r.name}</b>
-                <span class="code">{r.code}</span>
-              </td>
-              {r.ok ? (
-                <>
-                  <td class={`num ${r.change >= 0 ? 'up' : 'down'}`}>{r.price.toFixed(2)}</td>
-                  <td class={`num ${r.change >= 0 ? 'up' : 'down'}`}>
-                    {(r.change >= 0 ? '+' : '') + r.change.toFixed(2)}
-                  </td>
-                  <td class={`num ${r.change >= 0 ? 'up' : 'down'}`}>
-                    {(r.percent >= 0 ? '+' : '') + r.percent.toFixed(2)}%
-                  </td>
-                </>
-              ) : (
-                <td class="muted-cell" colspan="3">暂无数据</td>
-              )}
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const dir = directionOf(r);
+            return (
+              <tr>
+                <th scope="row">
+                  <b>{r.name}</b>
+                  <span class="code">{r.code}</span>
+                </th>
+                {r.ok && r.price != null ? (
+                  <>
+                    <td class={`num ${dir}`}>{r.price.toFixed(2)}</td>
+                    <td class={`num ${dir}`}>{signed(r.change ?? 0, dir)}</td>
+                    <td class={`num ${dir}`}>{signed(r.percent ?? 0, dir)}%</td>
+                  </>
+                ) : (
+                  <td class="muted-cell" colspan="3">暂无数据</td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
-    <p class="footnote">A股习惯红涨绿跌。行情为延迟数据，仅供兴趣展示，不构成投资建议。</p>
+    <p class="footnote">A股习惯红涨绿跌，平盘走灰。行情为延迟数据，仅供兴趣展示，不构成投资建议。</p>
   </div>
 
   <div class="demo-card" style="margin-top:18px">
@@ -65,7 +104,8 @@ const updated = new Date(generatedAt).toLocaleString('zh-CN', {
     <ol class="steps">
       <li>自选清单维护在 <code>src/data/stocks.watchlist.json</code>；</li>
       <li>每次构建前，<code>npm run fetch:stocks</code> 从东方财富的免费行情接口抓一次数据，写进 <code>src/data/stocks.json</code>；</li>
-      <li>GitHub Actions 在交易日收盘后定时重新构建部署，页面数据就自动更新了。</li>
+      <li>GitHub Actions 在交易日收盘后定时重新构建部署，页面数据就自动更新了；</li>
+      <li>万一接口抓不到，构建不会失败——沿用上一份数据，并在上面挂一条提示。</li>
     </ol>
     <p class="footnote">想加股票？往 watchlist 里添一行，secid 规则：沪市 <code>1.代码</code>，深市 <code>0.代码</code>。</p>
   </div>
@@ -76,25 +116,26 @@ const updated = new Date(generatedAt).toLocaleString('zh-CN', {
       color: var(--muted); font-size: 13px; margin-bottom: 12px;
     }
     .sample-tip {
-      background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
+      background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg);
       border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
     }
-    .sample-tip code { background: #ffedd5; padding: 1px 6px; border-radius: 6px; }
     .table-wrap { overflow-x: auto; }
     .stocks-table { width: 100%; border-collapse: collapse; min-width: 420px; }
     .stocks-table th, .stocks-table td {
       padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap;
     }
-    .stocks-table th { color: var(--muted); font-size: 13px; }
+    .stocks-table thead th { color: var(--muted); font-size: 13px; font-weight: 600; }
+    .stocks-table tbody th { font-weight: 400; }
     .stocks-table td.num, .stocks-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
     .stocks-table .code { color: var(--muted); font-size: 12px; margin-left: 8px; }
-    .up { color: #dc2626; font-weight: 600; }
-    .down { color: #16a34a; font-weight: 600; }
+    .up { color: var(--up); font-weight: 600; }
+    .down { color: var(--down); font-weight: 600; }
+    .flat { color: var(--flat); }
     .muted-cell { color: var(--muted); }
     .footnote { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
     .steps { margin: 10px 0 0; padding-left: 22px; line-height: 2; }
-    .steps code {
-      background: #f1f5f9; padding: 1px 6px; border-radius: 6px;
+    .steps code, .footnote code {
+      background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
     }
   </style>

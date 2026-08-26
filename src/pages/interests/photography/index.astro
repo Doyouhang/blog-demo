@@ -1,10 +1,23 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+
+const sliders = [
+  { id: 'brightness', label: '亮度', min: 50, max: 150, value: 100, unit: '%' },
+  { id: 'contrast', label: '对比度', min: 50, max: 150, value: 100, unit: '%' },
+  { id: 'saturate', label: '饱和度', min: 0, max: 200, value: 100, unit: '%' },
+  { id: 'hue', label: '色相', min: 0, max: 360, value: 0, unit: '°' },
+];
+const presets = [
+  { key: 'none', label: '原片' },
+  { key: 'film', label: '胶片' },
+  { key: 'bw', label: '黑白' },
+  { key: 'vivid', label: '鲜艳' },
+];
 ---
 <InterestLayout emoji="📷" title="摄影" description="给这张「照片」调调色，体验一把后期。拖动滑杆或选个预设。">
   <div class="demo-card">
     <div class="photo-frame">
-      <svg id="photo" viewBox="0 0 400 260" role="img" aria-label="示例风景照">
+      <svg id="photo" viewBox="0 0 400 260" role="img" aria-label="示例风景照：远山、太阳和草地">
         <defs>
           <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#8ec5fc" />
@@ -22,24 +35,26 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
       </svg>
     </div>
 
-    <div class="demo-row">
-      <button class="chip active" data-preset="none">原片</button>
-      <button class="chip" data-preset="film">胶片</button>
-      <button class="chip" data-preset="bw">黑白</button>
-      <button class="chip" data-preset="vivid">鲜艳</button>
+    <div class="demo-row" role="group" aria-label="预设风格">
+      {presets.map((p, i) => (
+        <button class="chip" type="button" data-preset={p.key} aria-pressed={i === 0 ? 'true' : 'false'}>
+          {p.label}
+        </button>
+      ))}
     </div>
 
-    <label class="demo-label" for="brightness">亮度 <span id="v-brightness">100</span>%</label>
-    <input type="range" id="brightness" min="50" max="150" value="100" />
-    <label class="demo-label" for="contrast">对比度 <span id="v-contrast">100</span>%</label>
-    <input type="range" id="contrast" min="50" max="150" value="100" />
-    <label class="demo-label" for="saturate">饱和度 <span id="v-saturate">100</span>%</label>
-    <input type="range" id="saturate" min="0" max="200" value="100" />
-    <label class="demo-label" for="hue">色相 <span id="v-hue">0</span>°</label>
-    <input type="range" id="hue" min="0" max="360" value="0" />
+    {sliders.map((s) => (
+      <>
+        <div class="slider-head">
+          <label class="demo-label" for={s.id}>{s.label}</label>
+          <span class="slider-val" aria-hidden="true"><span id={`v-${s.id}`}>{s.value}</span>{s.unit}</span>
+        </div>
+        <input type="range" id={s.id} min={s.min} max={s.max} value={s.value} />
+      </>
+    ))}
 
     <div class="demo-row">
-      <button id="reset" class="demo-btn ghost">重置</button>
+      <button id="reset" class="demo-btn ghost" type="button">重置</button>
       <code id="css-out" class="css-code"></code>
     </div>
   </div>
@@ -49,7 +64,12 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
       border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
       background: #0f172a;
     }
-    .photo-frame svg { display: block; width: 100%; height: auto; }
+    .photo-frame svg {
+      display: block; width: 100%; height: auto;
+      transition: filter var(--dur) var(--ease);
+    }
+    .slider-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .slider-val { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
     .css-code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px; color: var(--muted); word-break: break-all;
@@ -57,61 +77,70 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
   </style>
 
   <script>
-    const photo = document.getElementById('photo') as SVGElement;
-    const cssOut = document.getElementById('css-out') as HTMLElement;
-    const sliders = {
-      brightness: document.getElementById('brightness') as HTMLInputElement,
-      contrast: document.getElementById('contrast') as HTMLInputElement,
-      saturate: document.getElementById('saturate') as HTMLInputElement,
-      hue: document.getElementById('hue') as HTMLInputElement,
-    };
-    const labels = {
-      brightness: document.getElementById('v-brightness') as HTMLElement,
-      contrast: document.getElementById('v-contrast') as HTMLElement,
-      saturate: document.getElementById('v-saturate') as HTMLElement,
-      hue: document.getElementById('v-hue') as HTMLElement,
-    };
+    import { onPageReady, markReady } from '../../../scripts/init';
 
-    const presets: Record<string, { brightness: number; contrast: number; saturate: number; hue: number }> = {
+    type Adjust = { brightness: number; contrast: number; saturate: number; hue: number };
+
+    const PRESETS: Record<string, Adjust> = {
       none: { brightness: 100, contrast: 100, saturate: 100, hue: 0 },
       film: { brightness: 106, contrast: 88, saturate: 78, hue: 14 },
       bw: { brightness: 102, contrast: 112, saturate: 0, hue: 0 },
       vivid: { brightness: 100, contrast: 118, saturate: 165, hue: 0 },
     };
 
-    function apply() {
-      const b = sliders.brightness.value;
-      const c = sliders.contrast.value;
-      const s = sliders.saturate.value;
-      const h = sliders.hue.value;
-      labels.brightness.textContent = b;
-      labels.contrast.textContent = c;
-      labels.saturate.textContent = s;
-      labels.hue.textContent = h;
-      const filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%) hue-rotate(${h}deg)`;
-      photo.style.filter = filter;
-      cssOut.textContent = 'filter: ' + filter;
+    function initPhotoDemo() {
+      const card = document.querySelector<HTMLElement>('.demo-card');
+      if (!markReady(card)) return;
+
+      const photo = document.getElementById('photo');
+      const cssOut = document.getElementById('css-out');
+      if (!photo || !cssOut) return;
+
+      const keys = ['brightness', 'contrast', 'saturate', 'hue'] as const;
+      const sliders = {} as Record<(typeof keys)[number], HTMLInputElement>;
+      const labels = {} as Record<(typeof keys)[number], HTMLElement>;
+      for (const key of keys) {
+        const input = document.getElementById(key) as HTMLInputElement | null;
+        const label = document.getElementById(`v-${key}`);
+        if (!input || !label) return;
+        sliders[key] = input;
+        labels[key] = label;
+      }
+
+      function apply() {
+        const values = {
+          brightness: sliders.brightness.value,
+          contrast: sliders.contrast.value,
+          saturate: sliders.saturate.value,
+          hue: sliders.hue.value,
+        };
+        for (const key of keys) labels[key].textContent = values[key];
+        const filter =
+          `brightness(${values.brightness}%) contrast(${values.contrast}%) ` +
+          `saturate(${values.saturate}%) hue-rotate(${values.hue}deg)`;
+        (photo as unknown as HTMLElement).style.filter = filter;
+        cssOut!.textContent = 'filter: ' + filter;
+      }
+
+      for (const key of keys) sliders[key].addEventListener('input', apply);
+
+      const chips = document.querySelectorAll<HTMLElement>('.chip[data-preset]');
+      chips.forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const preset = PRESETS[chip.dataset.preset ?? 'none'] ?? PRESETS.none;
+          for (const key of keys) sliders[key].value = String(preset[key]);
+          chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+          apply();
+        });
+      });
+
+      document.getElementById('reset')?.addEventListener('click', () => {
+        document.querySelector<HTMLElement>('.chip[data-preset="none"]')?.click();
+      });
+
+      apply();
     }
 
-    Object.values(sliders).forEach((s) => s.addEventListener('input', apply));
-
-    document.querySelectorAll<HTMLElement>('.chip[data-preset]').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const p = presets[chip.dataset.preset ?? 'none'];
-        sliders.brightness.value = String(p.brightness);
-        sliders.contrast.value = String(p.contrast);
-        sliders.saturate.value = String(p.saturate);
-        sliders.hue.value = String(p.hue);
-        document.querySelectorAll('.chip[data-preset]').forEach((c) => c.classList.remove('active'));
-        chip.classList.add('active');
-        apply();
-      });
-    });
-
-    (document.getElementById('reset') as HTMLButtonElement).addEventListener('click', () => {
-      (document.querySelector('.chip[data-preset="none"]') as HTMLElement).click();
-    });
-
-    apply();
+    onPageReady(initPhotoDemo);
   </script>
 </InterestLayout>

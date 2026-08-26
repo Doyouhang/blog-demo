@@ -1,27 +1,48 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+
+const whiteKeys = [
+  { note: 'C4', freq: 261.63, label: 'C' },
+  { note: 'D4', freq: 293.66, label: 'D' },
+  { note: 'E4', freq: 329.63, label: 'E' },
+  { note: 'F4', freq: 349.23, label: 'F' },
+  { note: 'G4', freq: 392.0, label: 'G' },
+  { note: 'A4', freq: 440.0, label: 'A' },
+  { note: 'B4', freq: 493.88, label: 'B' },
+  { note: 'C5', freq: 523.25, label: 'C' },
+];
+const blackKeys = [
+  { note: 'C#4', freq: 277.18, left: '9%' },
+  { note: 'D#4', freq: 311.13, left: '21.5%' },
+  { note: 'F#4', freq: 369.99, left: '46.5%' },
+  { note: 'G#4', freq: 415.3, left: '59%' },
+  { note: 'A#4', freq: 466.16, left: '71.5%' },
+];
 ---
 <InterestLayout emoji="🎧" title="音乐" description="一架迷你钢琴，用 Web Audio 合成。点按琴键听听（手机端也可以）。">
   <div class="demo-card">
     <div class="piano">
-      <div class="piano-keys">
-        <button class="key white" data-freq="261.63" aria-label="C4">C</button>
-        <button class="key white" data-freq="293.66" aria-label="D4">D</button>
-        <button class="key white" data-freq="329.63" aria-label="E4">E</button>
-        <button class="key white" data-freq="349.23" aria-label="F4">F</button>
-        <button class="key white" data-freq="392.00" aria-label="G4">G</button>
-        <button class="key white" data-freq="440.00" aria-label="A4">A</button>
-        <button class="key white" data-freq="493.88" aria-label="B4">B</button>
-        <button class="key white" data-freq="523.25" aria-label="C5">C</button>
-
-        <button class="key black" data-freq="277.18" style="left:9%" aria-label="C#4"></button>
-        <button class="key black" data-freq="311.13" style="left:21.5%" aria-label="D#4"></button>
-        <button class="key black" data-freq="369.99" style="left:46.5%" aria-label="F#4"></button>
-        <button class="key black" data-freq="415.30" style="left:59%" aria-label="G#4"></button>
-        <button class="key black" data-freq="466.16" style="left:71.5%" aria-label="A#4"></button>
+      <div class="piano-keys" role="group" aria-label="迷你钢琴键盘">
+        {whiteKeys.map((k) => (
+          <button class="key white" type="button" data-freq={k.freq} aria-label={`弹奏 ${k.note}`}>
+            <span aria-hidden="true">{k.label}</span>
+          </button>
+        ))}
+        {blackKeys.map((k) => (
+          <button
+            class="key black"
+            type="button"
+            data-freq={k.freq}
+            style={`left:${k.left}`}
+            aria-label={`弹奏 ${k.note}`}
+          ></button>
+        ))}
       </div>
     </div>
-    <p class="demo-hint">💡 写代码卡住的时候，随便按几个键，假装自己是后摇乐队的键盘手。</p>
+    <p class="demo-hint">
+      <span aria-hidden="true">💡</span> 写代码卡住的时候，随便按几个键，假装自己是后摇乐队的键盘手。
+      用键盘的话：<kbd>Tab</kbd> 移到琴键，<kbd>空格</kbd> 或 <kbd>回车</kbd> 发声。
+    </p>
   </div>
 
   <style>
@@ -30,30 +51,43 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
       position: relative; display: flex; height: 190px;
       min-width: 460px; user-select: none;
     }
-    .key { border: none; cursor: pointer; font-family: inherit; }
+    .key {
+      border: none; cursor: pointer; font-family: inherit; padding: 0;
+      transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+    }
     .key.white {
-      flex: 1; background: #fff; border: 1px solid var(--border);
-      border-radius: 0 0 8px 8px; color: var(--muted); font-size: 13px;
+      flex: 1; background: #fff; border: 1px solid #d8dde4;
+      border-radius: 0 0 8px 8px; color: #65707a; font-size: 13px;
       display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;
     }
-    .key.white.active { background: var(--accent); color: #fff; }
+    .key.white.active { background: var(--accent); color: var(--accent-fg); }
     .key.black {
       position: absolute; top: 0; width: 7%; height: 60%;
       background: #1f2328; border-radius: 0 0 6px 6px; z-index: 2;
     }
     .key.black.active { background: var(--accent); }
-    .demo-hint { color: var(--muted); font-size: 14px; margin: 16px 0 0; }
+    .key.active { transform: translateY(2px); }
+    kbd {
+      background: var(--code-bg); border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 6px; padding: 1px 6px; font-size: 12px; font-family: inherit; color: var(--fg);
+    }
   </style>
 
   <script>
+    import { onPageReady, markReady } from '../../../scripts/init';
+
     let ctx: AudioContext | null = null;
 
     function play(freq: number) {
+      if (!freq) return;
       if (!ctx) {
-        const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const AC =
+          window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AC) return;
         ctx = new AC();
       }
-      if (ctx.state === 'suspended') ctx.resume();
+      if (ctx.state === 'suspended') void ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
@@ -68,15 +102,39 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
       osc.stop(t + 0.95);
     }
 
-    document.querySelectorAll<HTMLElement>('.key').forEach((key) => {
-      const freq = parseFloat(key.dataset.freq ?? '0');
-      key.addEventListener('pointerdown', () => {
-        play(freq);
-        key.classList.add('active');
+    function initPiano() {
+      const card = document.querySelector<HTMLElement>('.demo-card');
+      if (!markReady(card)) return;
+
+      const keys = document.querySelectorAll<HTMLElement>('.piano-keys .key');
+      if (!keys.length) return;
+
+      keys.forEach((key) => {
+        const freq = parseFloat(key.dataset.freq ?? '0');
+        const press = () => {
+          play(freq);
+          key.classList.add('active');
+        };
+        const release = () => key.classList.remove('active');
+
+        key.addEventListener('pointerdown', press);
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach((evt) =>
+          key.addEventListener(evt, release)
+        );
+
+        // 键盘操作：preventDefault 既拦住空格滚页，也避免浏览器再补一次 click
+        key.addEventListener('keydown', (e) => {
+          const ev = e as KeyboardEvent;
+          if (ev.key !== ' ' && ev.key !== 'Enter') return;
+          if (ev.repeat) return;
+          ev.preventDefault();
+          press();
+        });
+        key.addEventListener('keyup', release);
+        key.addEventListener('blur', release);
       });
-      ['pointerup', 'pointerleave', 'pointercancel'].forEach((evt) =>
-        key.addEventListener(evt, () => key.classList.remove('active'))
-      );
-    });
+    }
+
+    onPageReady(initPiano);
   </script>
 </InterestLayout>

@@ -3,50 +3,73 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
 ---
 <InterestLayout emoji="📚" title="读书" description="书架选书困难症？让随机挑选器帮你决定今晚读什么。">
   <div class="demo-card">
-    <div id="book" class="demo-result">
-      <div style="font-size:34px">📖</div>
+    <div id="book" class="demo-result" aria-live="polite">
+      <div aria-hidden="true" style="font-size:34px">📖</div>
       <div style="margin-top:8px;color:var(--muted)">点下面的按钮，从我的书架抽一本</div>
     </div>
     <div class="demo-row" style="justify-content:center">
-      <button id="pick" class="demo-btn">🎲 帮我挑一本</button>
+      <button id="pick" class="demo-btn" type="button">🎲 帮我挑一本</button>
     </div>
-    <p class="demo-hint">📚 书架共 <span id="count">0</span> 本，都是我想读或读过的。</p>
+    <p class="demo-hint center">
+      <span aria-hidden="true">📚</span> 书架共 <span id="count">0</span> 本，都是我想读或读过的。
+    </p>
   </div>
 
   <style>
     .demo-result .book-title { font-size: 20px; font-weight: 700; margin-top: 8px; }
     .demo-result .book-author { color: var(--muted); font-size: 14px; margin-top: 4px; }
-    .demo-hint { color: var(--muted); font-size: 14px; margin: 14px 0 0; text-align: center; }
   </style>
 
   <script>
-    const books = [
-      { t: '人类简史', a: '尤瓦尔·赫拉利', c: '社科' },
-      { t: '枪炮、病菌与钢铁', a: '贾雷德·戴蒙德', c: '历史' },
-      { t: '三体', a: '刘慈欣', c: '科幻' },
-      { t: '基地', a: '艾萨克·阿西莫夫', c: '科幻' },
-      { t: '置身事内', a: '兰小欢', c: '社科' },
-      { t: '万历十五年', a: '黄仁宇', c: '历史' },
-      { t: '你一生的故事', a: '特德·姜', c: '科幻' },
-      { t: '乡土中国', a: '费孝通', c: '社科' },
-      { t: '银河系搭车客指南', a: '道格拉斯·亚当斯', c: '科幻' },
-      { t: '叫魂', a: '孔飞力', c: '历史' },
+    import { onPageReady, markReady } from '../../../scripts/init';
+
+    const BOOKS = [
+      { title: '人类简史', author: '尤瓦尔·赫拉利', category: '社科' },
+      { title: '枪炮、病菌与钢铁', author: '贾雷德·戴蒙德', category: '历史' },
+      { title: '三体', author: '刘慈欣', category: '科幻' },
+      { title: '基地', author: '艾萨克·阿西莫夫', category: '科幻' },
+      { title: '置身事内', author: '兰小欢', category: '社科' },
+      { title: '万历十五年', author: '黄仁宇', category: '历史' },
+      { title: '你一生的故事', author: '特德·姜', category: '科幻' },
+      { title: '乡土中国', author: '费孝通', category: '社科' },
+      { title: '银河系搭车客指南', author: '道格拉斯·亚当斯', category: '科幻' },
+      { title: '叫魂', author: '孔飞力', category: '历史' },
     ];
 
-    const book = document.getElementById('book') as HTMLElement;
-    const pickBtn = document.getElementById('pick') as HTMLButtonElement;
-    (document.getElementById('count') as HTMLElement).textContent = String(books.length);
+    function initReadingDemo() {
+      const card = document.querySelector<HTMLElement>('.demo-card');
+      if (!markReady(card)) return;
 
-    let last = -1;
-    pickBtn.addEventListener('click', () => {
-      let i = Math.floor(Math.random() * books.length);
-      if (i === last) i = (i + 1) % books.length;
-      last = i;
-      const b = books[i];
-      book.innerHTML =
-        '<div style="font-size:34px">📖</div>' +
-        '<div class="book-title">《' + b.t + '》</div>' +
-        '<div class="book-author">' + b.a + ' · ' + b.c + '</div>';
-    });
+      const book = document.getElementById('book');
+      const pickBtn = document.getElementById('pick');
+      const count = document.getElementById('count');
+      if (!book || !pickBtn || !count) return;
+
+      count.textContent = String(BOOKS.length);
+      let last = -1;
+
+      pickBtn.addEventListener('click', () => {
+        let i = Math.floor(Math.random() * BOOKS.length);
+        if (i === last) i = (i + 1) % BOOKS.length;
+        last = i;
+        const b = BOOKS[i];
+
+        // 重建内容，让 .demo-result 的入场动画重新播一遍
+        book.replaceChildren();
+        const emoji = document.createElement('div');
+        emoji.style.fontSize = '34px';
+        emoji.setAttribute('aria-hidden', 'true');
+        emoji.textContent = '📖';
+        const title = document.createElement('div');
+        title.className = 'book-title';
+        title.textContent = `《${b.title}》`;
+        const author = document.createElement('div');
+        author.className = 'book-author';
+        author.textContent = `${b.author} · ${b.category}`;
+        book.append(emoji, title, author);
+      });
+    }
+
+    onPageReady(initReadingDemo);
   </script>
 </InterestLayout>

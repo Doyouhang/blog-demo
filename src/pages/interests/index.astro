@@ -1,24 +1,16 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { interests } from '../../data/interests';
 
 const B = import.meta.env.BASE_URL;
-const items = [
-  { emoji: '📷', slug: 'photography', title: '摄影', desc: '喜欢扫街和风光，器材是富士 X 系列。', tags: ['街头', '风光', '胶片模拟'] },
-  { emoji: '📚', slug: 'reading', title: '读书', desc: '偏社科、历史和科幻，今年目标是 24 本。', tags: ['非虚构', '科幻'] },
-  { emoji: '🧭', slug: 'travel', title: '旅行', desc: '走过川西、云南和东南亚，最爱小城慢生活。', tags: ['国内', '东南亚'] },
-  { emoji: '💻', slug: 'coding', title: '代码', desc: '业余写点小工具，最近在玩 Astro 和自动化。', tags: ['前端', '自动化'] },
-  { emoji: '🍳', slug: 'cooking', title: '下厨', desc: '周末喜欢研究面食和家常菜。', tags: ['面食', '家常'] },
-  { emoji: '🎧', slug: 'music', title: '音乐', desc: '从后摇到 city pop，写代码时循环播放。', tags: ['后摇', 'City Pop'] },
-  { emoji: '📈', slug: 'stocks', title: '股票', desc: '盯一盯 A 股自选股，行情由构建流水线定时刷新。', tags: ['A股', '自选股', '定时刷新'] },
-];
 ---
 <BaseLayout title="兴趣" description="我的兴趣分享，每个兴趣都配了一个可交互的小 demo">
   <h1>兴趣分享</h1>
   <p class="section-sub">工作之外，这些让我保持热爱生活。每个兴趣都配了一个小 demo，点进去玩玩。</p>
   <div class="grid">
-    {items.map((i) => (
-      <a class="card link-card" href={`${B}interests/${i.slug}/`}>
-        <div style="font-size:32px">{i.emoji}</div>
+    {interests.map((i) => (
+      <a class="card link-card reveal" href={`${B}interests/${i.slug}/`}>
+        <div class="card-emoji" aria-hidden="true" transition:name={`interest-${i.title}`}>{i.emoji}</div>
         <h3>{i.title}</h3>
         <p>{i.desc}</p>
         <div style="margin-top:10px">{i.tags.map((t) => <span class="tag">{t}</span>)}</div>

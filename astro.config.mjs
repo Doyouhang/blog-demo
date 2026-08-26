@@ -1,4 +1,5 @@
 import { defineConfig } from 'astro/config';
+import sitemap from '@astrojs/sitemap';
 
 // GitHub Pages 部署说明：
 // - 项目页：仓库 blog-demo → 地址 https://<用户名>.github.io/blog-demo/
@@ -11,4 +12,5 @@ export default defineConfig({
   base: BASE,
   site: 'https://doyouhang.github.io', // 你的 GitHub Pages 地址
   outDir: 'dist',
+  integrations: [sitemap()],
 });

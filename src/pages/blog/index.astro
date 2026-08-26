@@ -12,8 +12,8 @@ const posts = (await getCollection('posts'))
   <p class="section-sub">记录学习、生活与一些想法。</p>
   <ul class="post-list">
     {posts.map((p) => (
-      <li>
-        <a href={`${B}blog/${p.id}/`}>{p.data.title}</a>
+      <li class="reveal">
+        <a href={`${B}blog/${p.id}/`} transition:name={`post-${p.id}`}>{p.data.title}</a>
         <div class="post-meta">{p.data.pubDate.toISOString().slice(0, 10)} · {p.data.tags.join(' / ')}</div>
         <p style="margin:6px 0 0;color:var(--muted)">{p.data.description}</p>
       </li>
