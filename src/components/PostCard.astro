@@ -1,0 +1,22 @@
+---
+// 文章条目。首页、博客列表、标签页共用同一种呈现，避免同一类内容三种样子。
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+  /** 详情页的共享元素转场只能有一个来源，列表页之间不会同时出现，默认开启 */
+  transitionName?: boolean;
+}
+const { post, transitionName = true } = Astro.props;
+const B = import.meta.env.BASE_URL;
+---
+<a class="post-card reveal" href={`${B}blog/${post.id}/`}>
+  <div class="post-date">{post.data.pubDate.toISOString().slice(0, 10)}</div>
+  {transitionName ? (
+    <h3 transition:name={`post-${post.id}`}>{post.data.title}</h3>
+  ) : (
+    <h3>{post.data.title}</h3>
+  )}
+  <p>{post.data.description}</p>
+  <div>{post.data.tags.map((t) => <span class="tag">{t}</span>)}</div>
+</a>

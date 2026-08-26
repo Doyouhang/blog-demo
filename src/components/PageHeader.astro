@@ -1,0 +1,22 @@
+---
+// 全站统一页头：眉标 + 标题 + 一句导语。首页的身份区（.intro）是它的变体。
+interface Props {
+  /** 眉标，通常是所属分区或返回链接的文字 */
+  eyebrow?: string;
+  eyebrowHref?: string;
+  title: string;
+  lead?: string;
+}
+const { eyebrow, eyebrowHref, title, lead } = Astro.props;
+---
+<header class="page-head">
+  {eyebrow &&
+    (eyebrowHref ? (
+      <a class="eyebrow" href={eyebrowHref}>{eyebrow}</a>
+    ) : (
+      <span class="eyebrow">{eyebrow}</span>
+    ))}
+  <h1>{title}</h1>
+  {lead && <p class="lead">{lead}</p>}
+  <slot />
+</header>

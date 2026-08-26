@@ -31,6 +31,7 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
 >
   <div class="read-progress" aria-hidden="true"></div>
   <article>
+    <a class="eyebrow" href={`${B}blog/`}>← 返回博客</a>
     <h1 transition:name={`post-${post.id}`}>{post.data.title}</h1>
     <p class="date">
       {post.data.pubDate.toISOString().slice(0, 10)}
@@ -65,6 +66,5 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
       </nav>
     )}
 
-    <p style="margin-top:28px"><a href={`${B}blog/`}>← 返回文章列表</a></p>
   </article>
 </BaseLayout>

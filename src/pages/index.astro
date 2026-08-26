@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
+import PostCard from '../components/PostCard.astro';
 import type { IconName } from '../components/icons';
 import { getCollection } from 'astro:content';
 import { interests } from '../data/interests';
@@ -42,23 +43,16 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
       </div>
     </section>
 
-    <div class="home-grid">
-      <main class="home-main">
+    <div class="split">
+      <div class="split-main">
         <div class="sec-hd">
           <h2>最近文章</h2>
           <a href={`${B}blog/`}>全部文章 →</a>
         </div>
-        {posts.map((p) => (
-          <a class="post-card reveal" href={`${B}blog/${p.id}/`}>
-            <div class="post-date">{p.data.pubDate.toISOString().slice(0, 10)}</div>
-            <h3 transition:name={`post-${p.id}`}>{p.data.title}</h3>
-            <p>{p.data.description}</p>
-            <div>{p.data.tags.map((t) => <span class="tag">{t}</span>)}</div>
-          </a>
-        ))}
-      </main>
+        {posts.map((p) => <PostCard post={p} />)}
+      </div>
 
-      <aside class="home-aside">
+      <aside>
         <section class="side-box reveal">
           <h2>此刻</h2>
           {now.items.map((item) => (

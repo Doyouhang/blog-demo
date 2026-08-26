@@ -12,7 +12,7 @@ const { icon, title, description } = Astro.props;
 const B = import.meta.env.BASE_URL;
 ---
 <BaseLayout title={title} description={description ?? `${title}的小 demo`}>
-  <p class="back-link"><a href={`${B}interests/`}>← 返回兴趣列表</a></p>
+  <a class="eyebrow" href={`${B}interests/`}>← 返回兴趣列表</a>
   <div class="demo-head">
     <div class="demo-head-icon" transition:name={`interest-${title}`}>
       <Icon name={icon} size={40} />

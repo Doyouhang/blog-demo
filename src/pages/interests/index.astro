@@ -1,24 +1,18 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import InterestCard from '../../components/InterestCard.astro';
 import { interests } from '../../data/interests';
-
-const B = import.meta.env.BASE_URL;
 ---
-<BaseLayout title="兴趣" description="我的兴趣分享，每个兴趣都配了一个可交互的小 demo">
-  <h1>兴趣分享</h1>
-  <p class="section-sub">工作之外，这些让我保持热爱生活。每个兴趣都配了一个小 demo，点进去玩玩。</p>
-  <div class="grid">
-    {interests.map((i) => (
-      <a class="card link-card reveal" href={`${B}interests/${i.slug}/`}>
-        <div class="card-icon" transition:name={`interest-${i.title}`}>
-          <Icon name={i.icon} size={30} />
-        </div>
-        <h3>{i.title}</h3>
-        <p>{i.desc}</p>
-        <div style="margin-top:10px">{i.tags.map((t) => <span class="tag">{t}</span>)}</div>
-        <div class="card-cta">进去玩 →</div>
-      </a>
-    ))}
+<BaseLayout title="兴趣" description="我的兴趣分享，每个兴趣都配了一个可交互的小 demo" fullWidth>
+  <div class="container-wide">
+    <PageHeader
+      eyebrow={`${interests.length} 个兴趣`}
+      title="兴趣分享"
+      lead="工作之外，这些让我保持热爱生活。每个兴趣都配了一个能上手玩的小 demo。"
+    />
+    <div class="interest-grid">
+      {interests.map((i) => <InterestCard interest={i} />)}
+    </div>
   </div>
 </BaseLayout>

@@ -1,25 +1,59 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Icon from '../components/Icon.astro';
+
 const B = import.meta.env.BASE_URL;
 
 // 暂不公开邮箱：留空时下面那一行不渲染，页面不会有占位符残留。
 // 想放出来就填进来；介意被爬虫收走的话可以写成 "迩迩 [at] example [dot] com" 这种形式。
 const EMAIL = '';
 ---
-<BaseLayout title="关于" description="关于我">
-  <article>
-    <h1>关于我</h1>
-    <p>你好，我是迩迩，一个喜欢折腾技术和记录生活的人。</p>
-    <p>
-      这个站点用 <a href="https://astro.build">Astro</a> 搭建，源码托管在 GitHub，
-      通过 GitHub Pages 免费上线。你可以<a href={`${B}blog/`}>读读我的博客</a>，
-      或者看看<a href={`${B}interests/`}>我的兴趣</a>。
-    </p>
-    <h2>联系方式</h2>
-    <ul>
-      {EMAIL && <li>邮箱：<a href={`mailto:${EMAIL}`}>{EMAIL}</a></li>}
-      <li>GitHub：<a href="https://github.com/Doyouhang">@Doyouhang</a></li>
-      <li>订阅：<a href={`${B}rss.xml`}>RSS</a></li>
-    </ul>
-  </article>
+<BaseLayout title="关于" description="关于我，以及这个站是怎么搭的" fullWidth>
+  <div class="container-wide">
+    <PageHeader eyebrow="关于" title="关于我" lead="白天写代码，晚上折腾些没用但有趣的东西。" />
+    <div class="split">
+      <div class="split-main prose">
+        <p>
+          你好，我是迩迩，一个喜欢折腾技术和记录生活的人。这个站放我的博客和几个兴趣，
+          每个兴趣都配了能上手玩的小 demo —— 与其写一段"我喜欢摄影"，不如让你直接调一张照片的色。
+        </p>
+        <h2>这个站是怎么搭的</h2>
+        <p>
+          用 <a href="https://astro.build">Astro</a> 写的静态站，源码在 GitHub，通过 GitHub Pages 免费上线。
+          没有后端、没有数据库，所有页面在构建时就生成好了。
+        </p>
+        <p>
+          股票页的行情是构建时抓的：每次部署前跑一个脚本拉一次数据写进仓库，
+          再由 GitHub Actions 在交易日收盘后定时重新构建。所以页面上是延迟数据，但完全不需要服务器。
+        </p>
+      </div>
+      <aside>
+        <section class="side-box">
+          <h2>找到我</h2>
+          {EMAIL && (
+            <div class="side-row">
+              <Icon name="book" size={18} />
+              <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+            </div>
+          )}
+          <div class="side-row">
+            <Icon name="github" size={18} />
+            <a href="https://github.com/Doyouhang">@Doyouhang</a>
+          </div>
+          <div class="side-row">
+            <Icon name="rss" size={18} />
+            <a href={`${B}rss.xml`}>RSS 订阅</a>
+          </div>
+        </section>
+        <section class="side-box">
+          <h2>站点</h2>
+          <div class="side-row"><span>框架</span><span class="side-val">Astro</span></div>
+          <div class="side-row"><span>托管</span><span class="side-val">GitHub Pages</span></div>
+          <div class="side-row"><span>主题</span><span class="side-val">跟随系统，可切换</span></div>
+          <p class="side-foot">静态生成，无后端、无追踪脚本。</p>
+        </section>
+      </aside>
+    </div>
+  </div>
 </BaseLayout>

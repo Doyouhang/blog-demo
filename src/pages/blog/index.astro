@@ -1,22 +1,59 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import PostCard from '../../components/PostCard.astro';
+import TagCloud from '../../components/TagCloud.astro';
+import Icon from '../../components/Icon.astro';
 import { getCollection } from 'astro:content';
 
 const B = import.meta.env.BASE_URL;
 const posts = (await getCollection('posts'))
   .filter((p) => !p.data.draft)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const counts = new Map<string, number>();
+for (const p of posts) for (const t of p.data.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+const tags = [...counts.entries()]
+  .map(([tag, count]) => ({ tag, count }))
+  .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+
+const years = new Map<string, number>();
+for (const p of posts) {
+  const y = String(p.data.pubDate.getFullYear());
+  years.set(y, (years.get(y) ?? 0) + 1);
+}
+const archive = [...years.entries()].sort((a, b) => Number(b[0]) - Number(a[0]));
 ---
-<BaseLayout title="博客" description="文章列表">
-  <h1>博客</h1>
-  <p class="section-sub">记录学习、生活与一些想法。</p>
-  <ul class="post-list">
-    {posts.map((p) => (
-      <li class="reveal">
-        <a href={`${B}blog/${p.id}/`} transition:name={`post-${p.id}`}>{p.data.title}</a>
-        <div class="post-meta">{p.data.pubDate.toISOString().slice(0, 10)} · {p.data.tags.join(' / ')}</div>
-        <p style="margin:6px 0 0;color:var(--muted)">{p.data.description}</p>
-      </li>
-    ))}
-  </ul>
+<BaseLayout title="博客" description="记录学习、生活与一些想法" fullWidth>
+  <div class="container-wide">
+    <PageHeader eyebrow="全部文章" title="博客" lead="记录学习、生活与一些想法。" />
+    <div class="split">
+      <div class="split-main">
+        {posts.map((p) => <PostCard post={p} />)}
+      </div>
+      <aside>
+        <section class="side-box">
+          <h2>标签</h2>
+          <TagCloud tags={tags} />
+        </section>
+        <section class="side-box">
+          <h2>归档</h2>
+          {archive.map(([year, count]) => (
+            <div class="side-row">
+              <span>{year} 年</span>
+              <span class="side-val">{count} 篇</span>
+            </div>
+          ))}
+          <p class="side-foot">共 {posts.length} 篇</p>
+        </section>
+        <section class="side-box">
+          <h2>订阅</h2>
+          <div class="side-row">
+            <Icon name="rss" size={18} />
+            <a href={`${B}rss.xml`}>RSS 全文输出</a>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
 </BaseLayout>
