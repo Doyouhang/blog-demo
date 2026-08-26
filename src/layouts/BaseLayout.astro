@@ -1,16 +1,29 @@
 ---
+import { ClientRouter } from 'astro:transitions';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, OG_IMAGE } from '../consts';
 
 interface Props {
   title?: string;
   description?: string;
+  /** 文章页传 'article'，其余保持 'website' */
+  ogType?: 'website' | 'article';
+  /** 文章页传发布时间，用于 article:published_time */
+  publishedAt?: Date;
 }
-const { title = SITE_TITLE, description = SITE_DESCRIPTION } = Astro.props;
+const {
+  title = SITE_TITLE,
+  description = SITE_DESCRIPTION,
+  ogType = 'website',
+  publishedAt,
+} = Astro.props;
+
 const pageTitle = title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
 const B = import.meta.env.BASE_URL;
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : Astro.url.pathname;
+const ogImage = OG_IMAGE && Astro.site ? new URL(`${B}${OG_IMAGE}`, Astro.site).href : undefined;
 ---
 <!doctype html>
 <html lang="zh-CN">
@@ -18,9 +31,48 @@ const B = import.meta.env.BASE_URL;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
     <title>{pageTitle}</title>
+    <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={`${B}favicon.svg`} />
+    <link rel="sitemap" href={`${B}sitemap-index.xml`} />
     <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={`${B}rss.xml`} />
+
+    <!-- 社交分享预览 -->
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={SITE_TITLE} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="zh_CN" />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    {publishedAt && <meta property="article:published_time" content={publishedAt.toISOString()} />}
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
+
+    <!-- 主题：必须在首屏绘制前同步执行，否则暗色模式会闪一下白 -->
+    <script is:inline>
+      (() => {
+        const applyTheme = () => {
+          const root = document.documentElement;
+          root.classList.add('js');
+          try {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light' || saved === 'dark') root.dataset.theme = saved;
+            else delete root.dataset.theme;
+          } catch {
+            /* 隐私模式下 localStorage 会抛异常，跟随系统即可 */
+          }
+        };
+        applyTheme();
+        // 开了 ClientRouter 之后，换页会重写 <html> 上的属性，得再贴一次
+        document.addEventListener('astro:after-swap', applyTheme);
+      })();
+    </script>
+
+    <ClientRouter />
   </head>
   <body>
     <Header />
@@ -28,5 +80,33 @@ const B = import.meta.env.BASE_URL;
       <slot />
     </main>
     <Footer />
+
+    <script>
+      import { onPageReady, markReady } from '../scripts/init';
+
+      // 进场揭示：元素滚进视口才淡入上浮。JS 没跑起来时 .reveal 保持可见，不会白屏。
+      function initReveal() {
+        const main = document.querySelector<HTMLElement>('main');
+        if (!markReady(main)) return;
+        const els = document.querySelectorAll<HTMLElement>('.reveal:not(.in)');
+        if (!els.length) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          els.forEach((el) => el.classList.add('in'));
+          return;
+        }
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              entry.target.classList.add('in');
+              io.unobserve(entry.target);
+            });
+          },
+          { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+        );
+        els.forEach((el) => io.observe(el));
+      }
+      onPageReady(initReveal);
+    </script>
   </body>
 </html>
