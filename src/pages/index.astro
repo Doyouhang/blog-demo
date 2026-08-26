@@ -1,47 +1,118 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { getCollection } from 'astro:content';
 import Icon from '../components/Icon.astro';
-import { featuredInterests, interests } from '../data/interests';
+import type { IconName } from '../components/icons';
+import { getCollection } from 'astro:content';
+import { interests } from '../data/interests';
+import { AUTHOR } from '../consts';
+import nowData from '../data/now.json';
+import stockData from '../data/stocks.json';
 
 const B = import.meta.env.BASE_URL;
+
 const posts = (await getCollection('posts'))
   .filter((p) => !p.data.draft)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
   .slice(0, 3);
+
+// 「此刻」：手动维护的近况。数据结构和 stocks.json 一致，
+// 将来接 Gist 只要加一个构建期抓取脚本覆盖这个文件，本页不用改。
+interface NowItem { icon: IconName; text: string }
+const now = nowData as { updatedAt: string; items: NowItem[] };
+
+// 自选股：取涨跌幅绝对值最大的三只，另外用全部持仓画一排迷你柱
+interface StockRow { code: string; name: string; ok: boolean; percent?: number }
+const rows = (stockData as { rows: StockRow[] }).rows.filter((r) => r.ok && r.percent != null);
+const movers = [...rows].sort((a, b) => Math.abs(b.percent!) - Math.abs(a.percent!)).slice(0, 3);
+const maxAbs = Math.max(...rows.map((r) => Math.abs(r.percent!)), 0.5);
+const dirOf = (n: number) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');
+const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
 ---
-<BaseLayout>
-  <section class="hero">
-    <h1>你好，我是迩迩 👋</h1>
-    <p>这里是我用 Astro 搭的个人小站，写写博客、分享点兴趣爱好。欢迎随便逛逛。</p>
-  </section>
+<BaseLayout fullWidth>
+  <div class="container-wide">
+    <section class="intro">
+      <div class="avatar" aria-hidden="true">迩</div>
+      <div class="intro-text">
+        <h1>你好，我是{AUTHOR}</h1>
+        <p>白天写代码，晚上折腾些没用但有趣的东西。</p>
+      </div>
+      <div class="intro-links">
+        <a href="https://github.com/Doyouhang"><Icon name="github" size={16} />GitHub</a>
+        <a href={`${B}rss.xml`}><Icon name="rss" size={16} />RSS</a>
+      </div>
+    </section>
 
-  <h2 class="section-title">最近文章</h2>
-  <ul class="post-list">
-    {posts.map((p) => (
-      <li class="reveal">
-        <a href={`${B}blog/${p.id}/`} transition:name={`post-${p.id}`}>{p.data.title}</a>
-        <div class="post-meta">{p.data.pubDate.toISOString().slice(0, 10)} · {p.data.tags.join(' / ')}</div>
-      </li>
-    ))}
-  </ul>
-  <p><a href={`${B}blog/`}>查看全部文章 →</a></p>
-
-  <h2 class="section-title">我的兴趣</h2>
-  <p class="section-sub">工作之外，这些让我开心。</p>
-  <div class="grid grid-4">
-    {featuredInterests.map((i) => (
-      <a class="card link-card reveal" href={`${B}interests/${i.slug}/`}>
-        <div class="card-icon" transition:name={`interest-${i.title}`}>
-          <Icon name={i.icon} size={30} />
+    <div class="home-grid">
+      <main class="home-main">
+        <div class="sec-hd">
+          <h2>最近文章</h2>
+          <a href={`${B}blog/`}>全部文章 →</a>
         </div>
-        <h3>{i.title}</h3>
-        <p>{i.desc}</p>
-        <div class="card-cta">进去玩 →</div>
-      </a>
-    ))}
+        {posts.map((p) => (
+          <a class="post-card reveal" href={`${B}blog/${p.id}/`}>
+            <div class="post-date">{p.data.pubDate.toISOString().slice(0, 10)}</div>
+            <h3 transition:name={`post-${p.id}`}>{p.data.title}</h3>
+            <p>{p.data.description}</p>
+            <div>{p.data.tags.map((t) => <span class="tag">{t}</span>)}</div>
+          </a>
+        ))}
+      </main>
+
+      <aside class="home-aside">
+        <section class="side-box reveal">
+          <h2>此刻</h2>
+          {now.items.map((item) => (
+            <div class="side-row">
+              <Icon name={item.icon} size={18} />
+              <span>{item.text}</span>
+            </div>
+          ))}
+          <p class="side-foot">更新于 {now.updatedAt}</p>
+        </section>
+
+        {movers.length > 0 && (
+          <section class="side-box reveal">
+            <h2>自选股 · 收盘</h2>
+            {movers.map((r) => (
+              <div class="side-row">
+                <span>{r.name}</span>
+                <span class={`side-val ${dirOf(r.percent!)}`}>{sign(r.percent!)}</span>
+              </div>
+            ))}
+            <div class="spark" aria-hidden="true">
+              {rows.map((r) => (
+                <i
+                  class={dirOf(r.percent!)}
+                  style={`height:${Math.max(12, (Math.abs(r.percent!) / maxAbs) * 100)}%`}
+                  title={`${r.name} ${sign(r.percent!)}`}
+                ></i>
+              ))}
+            </div>
+            <p class="side-foot">
+              {rows.length} 只自选 · <a href={`${B}interests/stocks/`}>看全部 →</a>
+            </p>
+          </section>
+        )}
+      </aside>
+    </div>
   </div>
-  <p style="margin-top:18px">
-    <a href={`${B}interests/`}>查看全部 {interests.length} 个兴趣 →</a>
-  </p>
+
+  <div class="band">
+    <div class="container-wide band-inner">
+      <div class="sec-hd">
+        <h2>我的兴趣</h2>
+        <span class="sec-note">每个都配了能上手玩的小 demo</span>
+      </div>
+      <div class="int-row">
+        {interests.map((i) => (
+          <a class="int-cell reveal" href={`${B}interests/${i.slug}/`}>
+            <span class="int-icon" transition:name={`interest-${i.title}`}>
+              <Icon name={i.icon} size={26} />
+            </span>
+            <b>{i.title}</b>
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
 </BaseLayout>

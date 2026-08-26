@@ -10,6 +10,8 @@ interface Props {
   description?: string;
   /** 文章页传 'article'，其余保持 'website' */
   ogType?: 'website' | 'article';
+  /** 页面自己接管容器宽度（首页要做通栏色带时用） */
+  fullWidth?: boolean;
   /** 文章页传发布时间，用于 article:published_time */
   publishedAt?: Date;
 }
@@ -18,6 +20,7 @@ const {
   description = SITE_DESCRIPTION,
   ogType = 'website',
   publishedAt,
+  fullWidth = false,
 } = Astro.props;
 
 const pageTitle = title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
@@ -76,7 +79,7 @@ const ogImage = OG_IMAGE && Astro.site ? new URL(`${B}${OG_IMAGE}`, Astro.site).
   </head>
   <body>
     <Header />
-    <main class="container">
+    <main class:list={[!fullWidth && 'container']}>
       <slot />
     </main>
     <Footer />

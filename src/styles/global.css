@@ -35,6 +35,8 @@
 
   --radius: 14px;
   --max: 880px;
+  --max-wide: 1120px;   /* 首页用，文章页仍走 --max */
+  --bg-soft: #f4f6f9;   /* 分区色带 */
 
   /* 动效：统一时长与缓动，改一处全站生效 */
   --dur-fast: 120ms;
@@ -63,6 +65,7 @@
     --surface: #1c222b;
     --border: #272e38;
     --code-bg: #1c222b;
+    --bg-soft: #141a21;
 
     --console-bg: #0d1117;
     --console-fg: #d6dee8;
@@ -96,6 +99,7 @@
   --surface: #1c222b;
   --border: #272e38;
   --code-bg: #1c222b;
+  --bg-soft: #141a21;
 
   --console-bg: #0d1117;
   --console-fg: #d6dee8;
@@ -132,6 +136,7 @@ a:hover { text-decoration: underline; }
   border-radius: 4px;
 }
 .container { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+.container-wide { max-width: var(--max-wide); margin: 0 auto; padding: 0 24px; }
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; margin: -1px;
   padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -193,6 +198,88 @@ main { padding: 40px 0 60px; }
 
 .section-title { font-size: 22px; margin: 36px 0 4px; }
 .section-sub { color: var(--muted); margin: 0 0 4px; }
+
+/* ===== 首页 ===== */
+.sec-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.sec-hd h2 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.sec-hd a, .sec-note { font-size: 14px; color: var(--muted); }
+.sec-hd a:hover { color: var(--accent); text-decoration: none; }
+
+.intro {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  padding: 52px 0 40px; border-bottom: 1px solid var(--border);
+}
+.avatar {
+  width: 66px; height: 66px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: var(--accent-fg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 700; line-height: 1;
+}
+.intro-text h1 { font-size: 27px; margin: 0; letter-spacing: -0.01em; }
+.intro-text p { margin: 5px 0 0; color: var(--muted); font-size: 15px; }
+.intro-links { margin-left: auto; display: flex; gap: 10px; }
+.intro-links a {
+  display: inline-flex; align-items: center; gap: 7px; color: var(--fg);
+  border: 1px solid var(--border); background: var(--card);
+  border-radius: 10px; padding: 9px 15px; font-size: 14px; font-weight: 600;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.intro-links a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+
+/* 不对称双栏：左边文章，右边近况。空洞感主要靠这个结构解决 */
+.home-grid {
+  display: grid; grid-template-columns: 1.75fr 1fr; gap: 44px;
+  align-items: start; padding: 44px 0 72px;
+}
+.post-card {
+  display: block; padding: 22px 0; border-bottom: 1px solid var(--border); color: inherit;
+}
+.post-card:first-of-type { padding-top: 0; }
+.post-card:hover { text-decoration: none; }
+.post-card:hover h3 { color: var(--accent); }
+.post-date { font-size: 12.5px; color: var(--muted); }
+.post-card h3 {
+  font-size: 20px; margin: 8px 0 6px; letter-spacing: -0.01em;
+  transition: color var(--dur-fast) var(--ease);
+}
+.post-card p { margin: 0 0 10px; color: var(--muted); font-size: 14.5px; }
+
+.side-box {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); padding: 18px 20px; margin-bottom: 16px;
+}
+.side-box h2 {
+  margin: 0 0 12px; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.12em; color: var(--muted);
+}
+.side-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 0; font-size: 14.5px;
+}
+.side-row .icon { color: var(--accent); }
+.side-val { margin-left: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+.side-val.up { color: var(--up); font-weight: 600; }
+.side-val.down { color: var(--down); font-weight: 600; }
+.side-val.flat { color: var(--flat); }
+.spark { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin-top: 10px; }
+.spark i { flex: 1; border-radius: 2px; background: var(--accent-line); }
+.spark i.up { background: var(--up); opacity: .75; }
+.spark i.down { background: var(--down); opacity: .75; }
+.side-foot { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+
+/* 通栏色带：靠 BaseLayout 的 fullWidth 让首页自己接管容器 */
+.band { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-inner { padding: 60px 0; }
+.int-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+.int-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  padding: 20px 8px; border-radius: var(--radius); color: inherit;
+  background: var(--card); border: 1px solid var(--border);
+  transition: transform var(--dur) var(--ease-spring), border-color var(--dur) var(--ease);
+}
+.int-cell:hover { transform: translateY(-3px); border-color: var(--accent); text-decoration: none; }
+.int-icon { color: var(--accent); line-height: 0; }
+.int-cell b { font-size: 14px; font-weight: 600; }
 
 /* ===== 卡片 ===== */
 .grid {
@@ -418,6 +505,14 @@ footer.site {
   .demo-head-icon { width: 48px; height: 48px; border-radius: 13px; }
   .demo-head-icon .icon { width: 30px; height: 30px; }
   .demo-head h1 { font-size: 21px; }
+  .container-wide { padding: 0 16px; }
+  .intro { padding: 32px 0 26px; gap: 14px; }
+  .avatar { width: 52px; height: 52px; font-size: 24px; }
+  .intro-text h1 { font-size: 21px; }
+  .intro-links { margin-left: 0; width: 100%; }
+  .home-grid { grid-template-columns: 1fr; gap: 32px; padding: 30px 0 48px; }
+  .band-inner { padding: 40px 0; }
+  .int-row { grid-template-columns: repeat(4, 1fr); }
   .post-nav { grid-template-columns: 1fr; }
   .post-nav-next { text-align: left; }
 }
