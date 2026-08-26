@@ -3,57 +3,79 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
 ---
 <InterestLayout emoji="🧭" title="旅行" description="下一次出发还没想好？摇一个目的地 + 旅行风格灵感。">
   <div class="demo-card">
-    <div id="trip" class="demo-result">
-      <div style="font-size:34px">🗺️</div>
+    <div id="trip" class="demo-result" aria-live="polite">
+      <div aria-hidden="true" style="font-size:34px">🗺️</div>
       <div style="margin-top:8px;color:var(--muted)">点下面的按钮，生成一个旅行灵感</div>
     </div>
     <div class="demo-row" style="justify-content:center">
-      <button id="go" class="demo-btn">🎲 摇一个目的地</button>
+      <button id="go" class="demo-btn" type="button">🎲 摇一个目的地</button>
     </div>
-    <p class="demo-hint">🧳 灵感仅供娱乐，说走就走之前记得先看钱包。</p>
+    <p class="demo-hint center">
+      <span aria-hidden="true">🧳</span> 灵感仅供娱乐，说走就走之前记得先看钱包。
+    </p>
   </div>
 
   <style>
     .demo-result .trip-place { font-size: 22px; font-weight: 700; margin-top: 8px; }
     .demo-result .trip-style { color: var(--accent); font-size: 15px; margin-top: 4px; }
     .demo-result .trip-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
-    .demo-hint { color: var(--muted); font-size: 14px; margin: 14px 0 0; text-align: center; }
   </style>
 
   <script>
-    const places = [
+    import { onPageReady, markReady } from '../../../scripts/init';
+
+    const PLACES = [
       '大理的沙溪古镇', '川西的稻城亚丁', '云南的建水小城', '潮汕的汕头老城',
       '福建的泉州', '浙江的松阳', '广西的阳朔', '贵州的肇兴侗寨',
       '泰国的清迈', '越南的会安', '日本的高山', '斯里兰卡的埃拉',
     ];
-    const styles = [
-      { s: '🐢 小城慢生活', n: '找家咖啡馆坐一下午，不赶任何景点。' },
-      { s: '🥾 徒步看风光', n: '早起爬山，争取在山顶看一次日出。' },
-      { s: '🍜 一路吃过去', n: '把当地小吃从街头吃到街尾，不留遗憾。' },
-      { s: '📷 扫街拍照', n: '带上相机，记录当地人最日常的一瞬间。' },
-      { s: '🛕 逛古城看历史', n: '走进博物馆和老建筑，听一听过去的故事。' },
+    const STYLES = [
+      { style: '🐢 小城慢生活', note: '找家咖啡馆坐一下午，不赶任何景点。' },
+      { style: '🥾 徒步看风光', note: '早起爬山，争取在山顶看一次日出。' },
+      { style: '🍜 一路吃过去', note: '把当地小吃从街头吃到街尾，不留遗憾。' },
+      { style: '📷 扫街拍照', note: '带上相机，记录当地人最日常的一瞬间。' },
+      { style: '🛕 逛古城看历史', note: '走进博物馆和老建筑，听一听过去的故事。' },
     ];
 
-    const trip = document.getElementById('trip') as HTMLElement;
-    const goBtn = document.getElementById('go') as HTMLButtonElement;
-
-    function pick<T>(arr: T[], avoid: number): number {
-      let i = Math.floor(Math.random() * arr.length);
-      if (i === avoid) i = (i + 1) % arr.length;
-      return i;
+    function pickIndex(length: number, avoid: number): number {
+      const i = Math.floor(Math.random() * length);
+      return i === avoid ? (i + 1) % length : i;
     }
 
-    let lastP = -1;
-    let lastS = -1;
-    goBtn.addEventListener('click', () => {
-      lastP = pick(places, lastP);
-      lastS = pick(styles, lastS);
-      const style = styles[lastS];
-      trip.innerHTML =
-        '<div style="font-size:34px">🗺️</div>' +
-        '<div class="trip-place">' + places[lastP] + '</div>' +
-        '<div class="trip-style">' + style.s + '</div>' +
-        '<div class="trip-note">' + style.n + '</div>';
-    });
+    function initTravelDemo() {
+      const card = document.querySelector<HTMLElement>('.demo-card');
+      if (!markReady(card)) return;
+
+      const trip = document.getElementById('trip');
+      const goBtn = document.getElementById('go');
+      if (!trip || !goBtn) return;
+
+      let lastPlace = -1;
+      let lastStyle = -1;
+
+      goBtn.addEventListener('click', () => {
+        lastPlace = pickIndex(PLACES.length, lastPlace);
+        lastStyle = pickIndex(STYLES.length, lastStyle);
+        const picked = STYLES[lastStyle];
+
+        trip.replaceChildren();
+        const emoji = document.createElement('div');
+        emoji.style.fontSize = '34px';
+        emoji.setAttribute('aria-hidden', 'true');
+        emoji.textContent = '🗺️';
+        const place = document.createElement('div');
+        place.className = 'trip-place';
+        place.textContent = PLACES[lastPlace];
+        const style = document.createElement('div');
+        style.className = 'trip-style';
+        style.textContent = picked.style;
+        const note = document.createElement('div');
+        note.className = 'trip-note';
+        note.textContent = picked.note;
+        trip.append(emoji, place, style, note);
+      });
+    }
+
+    onPageReady(initTravelDemo);
   </script>
 </InterestLayout>

@@ -4,51 +4,167 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
 <InterestLayout emoji="💻" title="代码" description="一个迷你 JavaScript 运行器：改改代码，点「运行」看输出。">
   <div class="demo-card">
     <label class="demo-label" for="code">JavaScript 代码</label>
-    <textarea id="code" spellcheck="false"></textarea>
+    <textarea id="code" spellcheck="false" aria-describedby="code-note"></textarea>
     <div class="demo-row">
-      <button id="run" class="demo-btn">▶ 运行</button>
-      <button id="clear" class="demo-btn ghost">清空输出</button>
+      <button id="run" class="demo-btn" type="button">▶ 运行</button>
+      <button id="clear" class="demo-btn ghost" type="button">清空输出</button>
     </div>
     <label class="demo-label" for="output">输出</label>
-    <pre id="output" class="demo-console">// 运行结果会显示在这里</pre>
+    <pre id="output" class="demo-console" tabindex="0" aria-live="polite">// 运行结果会显示在这里</pre>
+    <p id="code-note" class="demo-hint">
+      <span aria-hidden="true">🔒</span> 代码跑在 Web Worker 里，和页面完全隔离：碰不到网页内容，
+      死循环也只会被超时掐掉（2 秒），不会卡住浏览器。
+      因为没有 DOM，<code>document</code>、<code>window</code> 在这里用不了，
+      <code>console.log</code> 和 <code>setTimeout</code> 正常。
+    </p>
   </div>
 
-  <script>
-    const code = document.getElementById('code') as HTMLTextAreaElement;
-    const output = document.getElementById('output') as HTMLPreElement;
-    const runBtn = document.getElementById('run') as HTMLButtonElement;
-    const clearBtn = document.getElementById('clear') as HTMLButtonElement;
+  <style>
+    .demo-hint code {
+      background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+    }
+  </style>
 
-    code.value = [
-      '// 试试改一改，然后点「运行」',
-      'const name = "迩迩";',
-      'for (let i = 1; i <= 3; i++) {',
-      '  console.log(name + " 第 " + i + " 次问好 👋");',
-      '}',
-      'console.log("1 + 2 =", 1 + 2);',
+  <script>
+    import { onPageReady, markReady } from '../../../scripts/init';
+
+    const TIMEOUT_MS = 2000;
+    const MAX_LINES = 500;
+    const PLACEHOLDER = '// 运行结果会显示在这里';
+
+    // Worker 源码：故意不用模板字符串，免得和外层 TS 的 ${} 打架
+    const WORKER_SRC = [
+      'const send = (type, data) => self.postMessage({ type: type, data: data });',
+      'const fmt = (v) => {',
+      '  if (typeof v === "string") return v;',
+      '  try { return (typeof v === "object" && v !== null) ? JSON.stringify(v) : String(v); }',
+      '  catch (e) { return String(v); }',
+      '};',
+      'const log = (...args) => send("log", args.map(fmt).join(" "));',
+      'self.console.log = log;',
+      'self.console.info = log;',
+      'self.console.warn = log;',
+      'self.console.error = log;',
+      'self.onmessage = (e) => {',
+      '  try { new Function(e.data)(); send("done"); }',
+      '  catch (err) { send("error", (err && err.message) ? err.message : String(err)); }',
+      '};',
     ].join('\n');
 
-    runBtn.addEventListener('click', () => {
-      const lines = [];
-      const originalLog = console.log;
-      console.log = (...args) => {
-        lines.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-      };
-      try {
-        new Function(code.value)();
-        output.textContent = lines.length ? lines.join('\n') : '（没有输出）';
-        output.classList.remove('err');
-      } catch (e) {
-        output.textContent = '出错了：' + e.message;
-        output.classList.add('err');
-      } finally {
-        console.log = originalLog;
-      }
-    });
+    let worker: Worker | null = null;
+    let blobUrl: string | null = null;
+    let watchdog: number | undefined;
 
-    clearBtn.addEventListener('click', () => {
-      output.textContent = '// 运行结果会显示在这里';
-      output.classList.remove('err');
-    });
+    function stopWorker() {
+      worker?.terminate();
+      worker = null;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        blobUrl = null;
+      }
+      if (watchdog !== undefined) {
+        clearTimeout(watchdog);
+        watchdog = undefined;
+      }
+    }
+
+    function initCodingDemo() {
+      const card = document.querySelector<HTMLElement>('.demo-card');
+      if (!markReady(card)) return;
+
+      const code = document.getElementById('code') as HTMLTextAreaElement | null;
+      const output = document.getElementById('output');
+      const runBtn = document.getElementById('run');
+      const clearBtn = document.getElementById('clear');
+      if (!code || !output || !runBtn || !clearBtn) return;
+
+      code.value = [
+        '// 试试改一改，然后点「运行」',
+        'const name = "迩迩";',
+        'for (let i = 1; i <= 3; i++) {',
+        '  console.log(name + " 第 " + i + " 次问好 👋");',
+        '}',
+        'console.log("1 + 2 =", 1 + 2);',
+        '',
+        '// 异步输出也接得住：',
+        'setTimeout(() => console.log("一秒后我也来了 ⏰"), 1000);',
+      ].join('\n');
+
+      let lines: string[] = [];
+      let truncated = false;
+
+      const render = () => {
+        const body = lines.length ? lines.join('\n') : '（没有输出）';
+        output.textContent = truncated ? `${body}\n… 输出过多，只显示前 ${MAX_LINES} 行` : body;
+      };
+
+      const fail = (message: string) => {
+        output.textContent = message;
+        output.classList.add('err');
+      };
+
+      runBtn.addEventListener('click', () => {
+        stopWorker();
+        lines = [];
+        truncated = false;
+        output.classList.remove('err');
+        output.textContent = '运行中…';
+
+        let created: Worker;
+        try {
+          blobUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'application/javascript' }));
+          created = new Worker(blobUrl);
+        } catch {
+          fail('这个浏览器不支持 Web Worker，跑不了代码沙箱。');
+          return;
+        }
+        worker = created;
+
+        created.addEventListener('message', (e: MessageEvent) => {
+          if (created !== worker) return; // 已经被新的一次运行取代
+          const msg = e.data as { type: string; data?: string };
+          if (msg.type === 'log') {
+            if (lines.length < MAX_LINES) lines.push(msg.data ?? '');
+            else truncated = true;
+            render();
+          } else if (msg.type === 'done') {
+            if (watchdog !== undefined) {
+              clearTimeout(watchdog);
+              watchdog = undefined;
+            }
+            render();
+          } else if (msg.type === 'error') {
+            if (watchdog !== undefined) {
+              clearTimeout(watchdog);
+              watchdog = undefined;
+            }
+            fail('出错了：' + (msg.data ?? '未知错误'));
+          }
+        });
+
+        created.addEventListener('error', () => fail('沙箱启动失败，换个浏览器试试。'));
+
+        watchdog = window.setTimeout(() => {
+          stopWorker();
+          fail(`执行超时（超过 ${TIMEOUT_MS / 1000} 秒，多半是死循环），已中止。`);
+        }, TIMEOUT_MS);
+
+        created.postMessage(code.value);
+      });
+
+      clearBtn.addEventListener('click', () => {
+        stopWorker();
+        lines = [];
+        truncated = false;
+        output.textContent = PLACEHOLDER;
+        output.classList.remove('err');
+      });
+    }
+
+    onPageReady(initCodingDemo);
+    // 换页时把还在跑的 worker 收掉，别留在后台
+    document.addEventListener('astro:before-swap', stopWorker);
+    window.addEventListener('pagehide', stopWorker);
   </script>
 </InterestLayout>

@@ -1,59 +1,100 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+
+const doughs = [
+  { hydration: 50, name: '手擀面' },
+  { hydration: 55, name: '拉面' },
+  { hydration: 45, name: '饺子皮' },
+  { hydration: 42, name: '刀削面' },
+];
 ---
 <InterestLayout emoji="🍳" title="下厨" description="面食配比计算器：选个面种、输入面粉量，实时算出水和盐。">
   <div class="demo-card">
-    <label class="demo-label">面种（决定含水量）</label>
-    <div class="demo-row">
-      <button class="chip active" data-hydra="50" data-name="手擀面">手擀面</button>
-      <button class="chip" data-hydra="55" data-name="拉面">拉面</button>
-      <button class="chip" data-hydra="45" data-name="饺子皮">饺子皮</button>
-      <button class="chip" data-hydra="42" data-name="刀削面">刀削面</button>
+    <span class="demo-label" id="dough-label">面种（决定含水量）</span>
+    <div class="demo-row" role="group" aria-labelledby="dough-label">
+      {doughs.map((d, i) => (
+        <button
+          class="chip"
+          type="button"
+          data-hydration={d.hydration}
+          data-name={d.name}
+          aria-pressed={i === 0 ? 'true' : 'false'}
+        >
+          {d.name}
+        </button>
+      ))}
     </div>
 
     <label class="demo-label" for="flour">面粉用量（克）</label>
     <input type="number" id="flour" min="50" max="2000" step="50" value="300" style="width:160px" />
 
     <div class="demo-result" style="margin-top:18px">
-      <div style="font-size:30px">🍜</div>
-      <div id="out" style="margin-top:10px;font-size:17px;line-height:2"></div>
+      <div aria-hidden="true" style="font-size:30px">🍜</div>
+      <div id="out" style="margin-top:10px;font-size:17px;line-height:2" aria-live="polite"></div>
     </div>
-    <p class="demo-hint">💧 含水量 = 水 ÷ 面粉。数值是参考，手感还得自己找。</p>
+    <p class="demo-hint center">
+      <span aria-hidden="true">💧</span> 含水量 = 水 ÷ 面粉。数值是参考，手感还得自己找。
+    </p>
   </div>
 
   <style>
-    .demo-hint { color: var(--muted); font-size: 14px; margin: 14px 0 0; text-align: center; }
     #out b { color: var(--accent); }
   </style>
 
   <script>
-    const flourInput = document.getElementById('flour') as HTMLInputElement;
-    const out = document.getElementById('out') as HTMLElement;
-    const chips = document.querySelectorAll<HTMLElement>('.chip[data-hydra]');
+    import { onPageReady, markReady } from '../../../scripts/init';
 
-    let hydra = 50;
-    let name = '手擀面';
+    function initCookingDemo() {
+      const card = document.querySelector<HTMLElement>('.demo-card');
+      if (!markReady(card)) return;
 
-    function calc() {
-      const flour = Math.max(0, parseFloat(flourInput.value) || 0);
-      const water = Math.round(flour * (hydra / 100));
-      const salt = Math.round(flour * 0.01 * 10) / 10;
-      out.innerHTML =
-        '<b>' + name + '</b>（含水量 ' + hydra + '%）<br />' +
-        '面粉 ' + flour + ' g → 水 <b>' + water + ' g</b> · 盐 <b>' + salt + ' g</b>';
+      const flourInput = document.getElementById('flour') as HTMLInputElement | null;
+      const out = document.getElementById('out');
+      const chips = document.querySelectorAll<HTMLElement>('.chip[data-hydration]');
+      if (!flourInput || !out || !chips.length) return;
+
+      let hydration = 50;
+      let name = '手擀面';
+
+      function calc() {
+        const flour = Math.max(0, parseFloat(flourInput!.value) || 0);
+        const water = Math.round(flour * (hydration / 100));
+        const salt = Math.round(flour * 0.01 * 10) / 10;
+
+        out!.replaceChildren();
+        const line1 = document.createElement('div');
+        const strongName = document.createElement('b');
+        strongName.textContent = name;
+        line1.append(strongName, document.createTextNode(`（含水量 ${hydration}%）`));
+
+        const line2 = document.createElement('div');
+        const strongWater = document.createElement('b');
+        strongWater.textContent = `${water} g`;
+        const strongSalt = document.createElement('b');
+        strongSalt.textContent = `${salt} g`;
+        line2.append(
+          document.createTextNode(`面粉 ${flour} g → 水 `),
+          strongWater,
+          document.createTextNode(' · 盐 '),
+          strongSalt
+        );
+
+        out!.append(line1, line2);
+      }
+
+      chips.forEach((chip) => {
+        chip.addEventListener('click', () => {
+          chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+          hydration = parseInt(chip.dataset.hydration ?? '50', 10);
+          name = chip.dataset.name ?? '面条';
+          calc();
+        });
+      });
+
+      flourInput.addEventListener('input', calc);
+      calc();
     }
 
-    chips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        chips.forEach((c) => c.classList.remove('active'));
-        chip.classList.add('active');
-        hydra = parseInt(chip.dataset.hydra ?? '50', 10);
-        name = chip.dataset.name ?? '面条';
-        calc();
-      });
-    });
-
-    flourInput.addEventListener('input', calc);
-    calc();
+    onPageReady(initCookingDemo);
   </script>
 </InterestLayout>
