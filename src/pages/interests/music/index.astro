@@ -1,5 +1,6 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+import Icon from '../../../components/Icon.astro';
 
 const whiteKeys = [
   { note: 'C4', freq: 261.63, label: 'C' },
@@ -19,7 +20,7 @@ const blackKeys = [
   { note: 'A#4', freq: 466.16, left: '71.5%' },
 ];
 ---
-<InterestLayout emoji="🎧" title="音乐" description="一架迷你钢琴，用 Web Audio 合成。点按琴键听听（手机端也可以）。">
+<InterestLayout icon="headphones" title="音乐" description="一架迷你钢琴，用 Web Audio 合成。点按琴键听听（手机端也可以）。">
   <div class="demo-card">
     <div class="piano">
       <div class="piano-keys" role="group" aria-label="迷你钢琴键盘">
@@ -40,7 +41,7 @@ const blackKeys = [
       </div>
     </div>
     <p class="demo-hint">
-      <span aria-hidden="true">💡</span> 写代码卡住的时候，随便按几个键，假装自己是后摇乐队的键盘手。
+      <Icon name="bulb" size={15} /> 写代码卡住的时候，随便按几个键，假装自己是后摇乐队的键盘手。
       用键盘的话：<kbd>Tab</kbd> 移到琴键，<kbd>空格</kbd> 或 <kbd>回车</kbd> 发声。
     </p>
   </div>

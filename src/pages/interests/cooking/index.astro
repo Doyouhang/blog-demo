@@ -1,5 +1,6 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+import Icon from '../../../components/Icon.astro';
 
 const doughs = [
   { hydration: 50, name: '手擀面' },
@@ -8,7 +9,7 @@ const doughs = [
   { hydration: 42, name: '刀削面' },
 ];
 ---
-<InterestLayout emoji="🍳" title="下厨" description="面食配比计算器：选个面种、输入面粉量，实时算出水和盐。">
+<InterestLayout icon="pot" title="下厨" description="面食配比计算器：选个面种、输入面粉量，实时算出水和盐。">
   <div class="demo-card">
     <span class="demo-label" id="dough-label">面种（决定含水量）</span>
     <div class="demo-row" role="group" aria-labelledby="dough-label">
@@ -29,11 +30,11 @@ const doughs = [
     <input type="number" id="flour" min="50" max="2000" step="50" value="300" style="width:160px" />
 
     <div class="demo-result" style="margin-top:18px">
-      <div aria-hidden="true" style="font-size:30px">🍜</div>
+      <div class="result-icon"><Icon name="bowl" size={30} /></div>
       <div id="out" style="margin-top:10px;font-size:17px;line-height:2" aria-live="polite"></div>
     </div>
     <p class="demo-hint center">
-      <span aria-hidden="true">💧</span> 含水量 = 水 ÷ 面粉。数值是参考，手感还得自己找。
+      <Icon name="droplet" size={15} /> 含水量 = 水 ÷ 面粉。数值是参考，手感还得自己找。
     </p>
   </div>
 

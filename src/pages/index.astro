@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import Icon from '../components/Icon.astro';
 import { featuredInterests, interests } from '../data/interests';
 
 const B = import.meta.env.BASE_URL;
@@ -31,7 +32,9 @@ const posts = (await getCollection('posts'))
   <div class="grid grid-4">
     {featuredInterests.map((i) => (
       <a class="card link-card reveal" href={`${B}interests/${i.slug}/`}>
-        <div class="card-emoji" aria-hidden="true" transition:name={`interest-${i.title}`}>{i.emoji}</div>
+        <div class="card-icon" transition:name={`interest-${i.title}`}>
+          <Icon name={i.icon} size={30} />
+        </div>
         <h3>{i.title}</h3>
         <p>{i.desc}</p>
         <div class="card-cta">进去玩 →</div>

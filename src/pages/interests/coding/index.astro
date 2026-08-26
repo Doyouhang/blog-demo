@@ -1,18 +1,19 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+import Icon from '../../../components/Icon.astro';
 ---
-<InterestLayout emoji="💻" title="代码" description="一个迷你 JavaScript 运行器：改改代码，点「运行」看输出。">
+<InterestLayout icon="code" title="代码" description="一个迷你 JavaScript 运行器：改改代码，点「运行」看输出。">
   <div class="demo-card">
     <label class="demo-label" for="code">JavaScript 代码</label>
     <textarea id="code" spellcheck="false" aria-describedby="code-note"></textarea>
     <div class="demo-row">
-      <button id="run" class="demo-btn" type="button">▶ 运行</button>
+      <button id="run" class="demo-btn" type="button"><Icon name="play" size={14} />运行</button>
       <button id="clear" class="demo-btn ghost" type="button">清空输出</button>
     </div>
     <label class="demo-label" for="output">输出</label>
     <pre id="output" class="demo-console" tabindex="0" aria-live="polite">// 运行结果会显示在这里</pre>
     <p id="code-note" class="demo-hint">
-      <span aria-hidden="true">🔒</span> 代码跑在 Web Worker 里，和页面完全隔离：碰不到网页内容，
+      <Icon name="lock" size={15} /> 代码跑在 Web Worker 里，和页面完全隔离：碰不到网页内容，
       死循环也只会被超时掐掉（2 秒），不会卡住浏览器。
       因为没有 DOM，<code>document</code>、<code>window</code> 在这里用不了，
       <code>console.log</code> 和 <code>setTimeout</code> 正常。

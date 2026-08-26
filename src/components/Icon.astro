@@ -1,0 +1,29 @@
+---
+import { ICONS, type IconName } from './icons';
+
+interface Props {
+  name: IconName;
+  /** 像素尺寸，默认 20 */
+  size?: number;
+  class?: string;
+  /** 图标承载信息时传文字；不传则按装饰性处理，对读屏隐藏 */
+  label?: string;
+}
+const { name, size = 20, class: className, label } = Astro.props;
+const path = ICONS[name];
+---
+<svg
+  class:list={['icon', className]}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="currentColor"
+  role={label ? 'img' : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : 'true'}
+  focusable="false"
+><Fragment set:html={path} /></svg>
+
+<style>
+  .icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+</style>

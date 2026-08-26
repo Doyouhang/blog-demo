@@ -1,4 +1,6 @@
 ---
+import Icon from './Icon.astro';
+
 const B = import.meta.env.BASE_URL;
 const nav = [
   { href: `${B}`, label: '首页' },
@@ -28,8 +30,8 @@ const isCurrent = (href: string) => (href === B ? path === B : path.startsWith(h
         aria-label="切换深色 / 浅色主题"
         title="切换深色 / 浅色主题"
       >
-        <span class="icon-light" aria-hidden="true">☀️</span>
-        <span class="icon-dark" aria-hidden="true">🌙</span>
+        <span class="icon-light"><Icon name="sun" size={16} /></span>
+        <span class="icon-dark"><Icon name="moon" size={16} /></span>
       </button>
     </div>
   </nav>

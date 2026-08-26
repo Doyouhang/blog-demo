@@ -1,5 +1,6 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+import Icon from '../../../components/Icon.astro';
 import stockData from '../../../data/stocks.json';
 
 interface StockRow {
@@ -42,7 +43,7 @@ const signed = (n: number, dir: Direction, digits = 2) =>
 
 const okRows = rows.filter((r) => r.ok);
 ---
-<InterestLayout emoji="📈" title="股票" description="A股自选股看板：行情在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
+<InterestLayout icon="chart" title="股票" description="A股自选股看板：行情在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
   <div class="demo-card">
     <div class="stocks-bar">
       <span>{okRows.length} 只自选 · {isSample ? '示例数据' : '东方财富行情'}</span>
@@ -51,13 +52,13 @@ const okRows = rows.filter((r) => r.ok);
 
     {isSample && (
       <div class="sample-tip">
-        ⚠️ 当前展示的是示例数据（行情接口还没成功抓取过）。下一次构建抓到数据后会自动换成真实行情。
+        <Icon name="alert" size={15} /> 当前展示的是示例数据（行情接口还没成功抓取过）。下一次构建抓到数据后会自动换成真实行情。
       </div>
     )}
 
     {!isSample && stale && (
       <div class="sample-tip">
-        ⚠️ 最近一次构建没能连上行情接口，下面是上一次抓到的数据（{updated}），不是最新价。
+        <Icon name="alert" size={15} /> 最近一次构建没能连上行情接口，下面是上一次抓到的数据（{updated}），不是最新价。
       </div>
     )}
 

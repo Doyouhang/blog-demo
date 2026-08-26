@@ -1,17 +1,18 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
+import Icon from '../../../components/Icon.astro';
 ---
-<InterestLayout emoji="🧭" title="旅行" description="下一次出发还没想好？摇一个目的地 + 旅行风格灵感。">
+<InterestLayout icon="compass" title="旅行" description="下一次出发还没想好？摇一个目的地 + 旅行风格灵感。">
   <div class="demo-card">
     <div id="trip" class="demo-result" aria-live="polite">
-      <div aria-hidden="true" style="font-size:34px">🗺️</div>
+      <div class="result-icon"><Icon name="map" size={34} /></div>
       <div style="margin-top:8px;color:var(--muted)">点下面的按钮，生成一个旅行灵感</div>
     </div>
     <div class="demo-row" style="justify-content:center">
-      <button id="go" class="demo-btn" type="button">🎲 摇一个目的地</button>
+      <button id="go" class="demo-btn" type="button"><Icon name="dice" size={16} />摇一个目的地</button>
     </div>
     <p class="demo-hint center">
-      <span aria-hidden="true">🧳</span> 灵感仅供娱乐，说走就走之前记得先看钱包。
+      <Icon name="luggage" size={15} /> 灵感仅供娱乐，说走就走之前记得先看钱包。
     </p>
   </div>
 
@@ -30,11 +31,11 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
       '泰国的清迈', '越南的会安', '日本的高山', '斯里兰卡的埃拉',
     ];
     const STYLES = [
-      { style: '🐢 小城慢生活', note: '找家咖啡馆坐一下午，不赶任何景点。' },
-      { style: '🥾 徒步看风光', note: '早起爬山，争取在山顶看一次日出。' },
-      { style: '🍜 一路吃过去', note: '把当地小吃从街头吃到街尾，不留遗憾。' },
-      { style: '📷 扫街拍照', note: '带上相机，记录当地人最日常的一瞬间。' },
-      { style: '🛕 逛古城看历史', note: '走进博物馆和老建筑，听一听过去的故事。' },
+      { style: '小城慢生活', note: '找家咖啡馆坐一下午，不赶任何景点。' },
+      { style: '徒步看风光', note: '早起爬山，争取在山顶看一次日出。' },
+      { style: '一路吃过去', note: '把当地小吃从街头吃到街尾，不留遗憾。' },
+      { style: '扫街拍照', note: '带上相机，记录当地人最日常的一瞬间。' },
+      { style: '逛古城看历史', note: '走进博物馆和老建筑，听一听过去的故事。' },
     ];
 
     function pickIndex(length: number, avoid: number): number {
@@ -50,6 +51,8 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
       const goBtn = document.getElementById('go');
       if (!trip || !goBtn) return;
 
+      // 先把初始图标存一份，后面每次重建内容都从它克隆
+      const iconTemplate = trip.querySelector('.result-icon');
       let lastPlace = -1;
       let lastStyle = -1;
 
@@ -58,11 +61,9 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
         lastStyle = pickIndex(STYLES.length, lastStyle);
         const picked = STYLES[lastStyle];
 
+        const icon = iconTemplate?.cloneNode(true);
         trip.replaceChildren();
-        const emoji = document.createElement('div');
-        emoji.style.fontSize = '34px';
-        emoji.setAttribute('aria-hidden', 'true');
-        emoji.textContent = '🗺️';
+        if (icon) trip.append(icon);
         const place = document.createElement('div');
         place.className = 'trip-place';
         place.textContent = PLACES[lastPlace];
@@ -72,7 +73,7 @@ import InterestLayout from '../../../layouts/InterestLayout.astro';
         const note = document.createElement('div');
         note.className = 'trip-note';
         note.textContent = picked.note;
-        trip.append(emoji, place, style, note);
+        trip.append(place, style, note);
       });
     }
 

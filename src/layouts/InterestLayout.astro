@@ -1,18 +1,22 @@
 ---
 import BaseLayout from './BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+import type { IconName } from '../components/icons';
 
 interface Props {
-  emoji: string;
+  icon: IconName;
   title: string;
   description?: string;
 }
-const { emoji, title, description } = Astro.props;
+const { icon, title, description } = Astro.props;
 const B = import.meta.env.BASE_URL;
 ---
-<BaseLayout title={`${emoji} ${title}`} description={description ?? `${title}的小 demo`}>
+<BaseLayout title={title} description={description ?? `${title}的小 demo`}>
   <p class="back-link"><a href={`${B}interests/`}>← 返回兴趣列表</a></p>
   <div class="demo-head">
-    <div class="demo-head-emoji" aria-hidden="true" transition:name={`interest-${title}`}>{emoji}</div>
+    <div class="demo-head-icon" transition:name={`interest-${title}`}>
+      <Icon name={icon} size={40} />
+    </div>
     <div>
       <h1>{title}</h1>
       {description && <p class="demo-head-desc">{description}</p>}
