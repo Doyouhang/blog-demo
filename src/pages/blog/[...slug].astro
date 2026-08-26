@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
+import { readingMinutes } from '../../utils/reading-time';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
@@ -13,6 +14,7 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const { Content } = await render(post);
 const B = import.meta.env.BASE_URL;
+const minutes = readingMinutes(post.body ?? '');
 
 const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
@@ -21,10 +23,20 @@ const index = posts.findIndex((p) => p.id === post.id);
 const newer = index > 0 ? posts[index - 1] : undefined;
 const older = index < posts.length - 1 ? posts[index + 1] : undefined;
 ---
-<BaseLayout title={post.data.title} description={post.data.description}>
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  ogType="article"
+  publishedAt={post.data.pubDate}
+>
+  <div class="read-progress" aria-hidden="true"></div>
   <article>
-    <h1>{post.data.title}</h1>
-    <p class="date">{post.data.pubDate.toISOString().slice(0, 10)}</p>
+    <h1 transition:name={`post-${post.id}`}>{post.data.title}</h1>
+    <p class="date">
+      {post.data.pubDate.toISOString().slice(0, 10)}
+      <span aria-hidden="true"> · </span>
+      约 {minutes} 分钟读完
+    </p>
     <div>
       {post.data.tags.map((t) => (
         <a class="tag" href={`${B}blog/tags/${encodeURIComponent(t)}/`}>{t}</a>
@@ -33,7 +45,7 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
     <div class="prose" style="margin-top:18px"><Content /></div>
 
     {(newer || older) && (
-      <nav class="post-nav">
+      <nav class="post-nav" aria-label="文章导航">
         <div>
           {newer && (
             <>
