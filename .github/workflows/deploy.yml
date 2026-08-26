@@ -29,6 +29,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Type check
+        run: npm run check
+      # 抓不到行情也不会失败，脚本会退回上一份数据（页面上会提示）
       - name: Fetch stock quotes
         run: npm run fetch:stocks
       - run: npm run build
