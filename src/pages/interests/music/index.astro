@@ -47,7 +47,15 @@ const blackKeys = [
   </div>
 
   <style>
-    .piano { overflow-x: auto; }
+    .piano {
+      /* 窄屏靠它横向滚动。但只写 overflow-x 时，overflow-y 的计算值会变成 auto
+         而不是 visible（规范如此：二者之一非 visible，visible 就被算成 auto），
+         于是按键的 translateY(2px) 会把内容撑出 2px，右侧冒出一条纵向滚动条，
+         一按琴键整块就抖。显式关掉纵向滚动，再留点 padding 给按下位移和焦点环。 */
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 4px 0;
+    }
     .piano-keys {
       position: relative; display: flex; height: 190px;
       min-width: 460px; user-select: none;
