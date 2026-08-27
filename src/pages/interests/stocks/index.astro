@@ -11,6 +11,8 @@ interface StockRow {
   price?: number;
   change?: number;
   percent?: number;
+  /** 跟着市场走：A股 CNY，港股 HKD。混排时必须在表里标出来 */
+  currency?: string;
 }
 interface StockData {
   source: string;
@@ -43,7 +45,7 @@ const signed = (n: number, dir: Direction, digits = 2) =>
 
 const okRows = rows.filter((r) => r.ok);
 ---
-<InterestLayout icon="chart" title="股票" description="A股自选股看板：行情在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
+<InterestLayout icon="chart" title="股票" description="A股 + 港股自选股看板：行情在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
   <div class="demo-card">
     <div class="stocks-bar">
       <span>{okRows.length} 只自选 · {isSample ? '示例数据' : '东方财富行情'}</span>
@@ -68,7 +70,7 @@ const okRows = rows.filter((r) => r.ok);
         <thead>
           <tr>
             <th scope="col">股票</th>
-            <th scope="col" class="num">最新价</th>
+            <th scope="col" class="num">最新价<span class="unit">原币种</span></th>
             <th scope="col" class="num">涨跌</th>
             <th scope="col" class="num">涨跌幅</th>
           </tr>
@@ -81,6 +83,7 @@ const okRows = rows.filter((r) => r.ok);
                 <th scope="row">
                   <b>{r.name}</b>
                   <span class="code">{r.code}</span>
+                  {r.currency === 'HKD' && <span class="mkt">HK$</span>}
                 </th>
                 {r.ok && r.price != null ? (
                   <>
@@ -97,7 +100,7 @@ const okRows = rows.filter((r) => r.ok);
         </tbody>
       </table>
     </div>
-    <p class="footnote">A股习惯红涨绿跌，平盘走灰。行情为延迟数据，仅供兴趣展示，不构成投资建议。</p>
+    <p class="footnote">A股习惯红涨绿跌，平盘走灰。标了 <span class="mkt">HK$</span> 的是港股，价格为港元，其余为人民币；跨币种不做换算，涨跌幅本身与币种无关。行情为延迟数据，仅供兴趣展示，不构成投资建议。</p>
   </div>
 
   <div class="demo-card" style="margin-top:18px">
@@ -108,7 +111,7 @@ const okRows = rows.filter((r) => r.ok);
       <li>GitHub Actions 在交易日收盘后定时重新构建部署，页面数据就自动更新了；</li>
       <li>万一接口抓不到，构建不会失败——沿用上一份数据，并在上面挂一条提示。</li>
     </ol>
-    <p class="footnote">想加股票？往 watchlist 里添一行，secid 规则：沪市 <code>1.代码</code>，深市 <code>0.代码</code>。</p>
+    <p class="footnote">想加股票？往 watchlist 里添一行，secid 规则：沪市 <code>1.代码</code>，深市 <code>0.代码</code>，港股 <code>116.代码</code>（五位，如 <code>116.09988</code>）。</p>
   </div>
 
   <style>
@@ -129,6 +132,16 @@ const okRows = rows.filter((r) => r.ok);
     .stocks-table tbody th { font-weight: 400; }
     .stocks-table td.num, .stocks-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
     .stocks-table .code { color: var(--muted); font-size: 12px; margin-left: 8px; }
+    .mkt {
+      display: inline-block; padding: 0 5px;
+      border: 1px solid var(--border); border-radius: 5px;
+      color: var(--muted); font-size: 11px; line-height: 17px; vertical-align: 1px;
+      font-variant-numeric: normal;
+    }
+    .stocks-table .mkt { margin-left: 6px; }
+    .stocks-table thead .unit {
+      display: block; font-weight: 400; font-size: 11px; opacity: .75;
+    }
     .up { color: var(--up); font-weight: 600; }
     .down { color: var(--down); font-weight: 600; }
     .flat { color: var(--flat); }
