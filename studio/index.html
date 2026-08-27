@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Studio · 迩迩的小站</title>
+<style>
+  :root {
+    --bg: #fdfdfd; --panel: #fff; --fg: #1f2328; --muted: #65707a;
+    --border: #e6e8eb; --accent: #2f6df0; --accent-weak: #eef3ff;
+    --ok: #16a34a; --warn-bg: #fff7ed; --warn-fg: #9a3412; --warn-border: #fed7aa;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --panel: #161a20; --fg: #e4e8ee; --muted: #98a3b0;
+      --border: #262c34; --accent: #6ea8ff; --accent-weak: #17243a;
+      --warn-bg: #2a1d10; --warn-fg: #fdba74; --warn-border: #7c4a1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: grid; grid-template-columns: 260px 1fr; height: 100vh; overflow: hidden;
+  }
+  /* 侧栏 */
+  .side { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .brand { padding: 16px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .brand small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 2px; }
+  .types { padding: 10px; display: flex; gap: 6px; }
+  .types button {
+    flex: 1; padding: 7px 0; border: 1px solid var(--border); background: var(--panel);
+    color: var(--fg); border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  .types button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .list { flex: 1; overflow: auto; padding: 0 10px 10px; min-height: 0; }
+  .list button {
+    display: block; width: 100%; text-align: left; padding: 9px 10px; margin-bottom: 4px;
+    border: 1px solid transparent; background: none; color: var(--fg); border-radius: 8px;
+    cursor: pointer; font: inherit; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .list button:hover { background: var(--accent-weak); }
+  .list button[aria-current="true"] { background: var(--accent-weak); border-color: var(--accent); }
+  .list .new { color: var(--accent); font-weight: 600; }
+  .list .draft::after { content: '草稿'; float: right; font-size: 11px; color: var(--muted); }
+
+  /* 主区 */
+  .main { display: flex; flex-direction: column; min-height: 0; }
+  .bar {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .bar .hint { color: var(--muted); font-size: 13px; margin-right: auto; }
+  .form { flex: 1; overflow: auto; padding: 20px; min-height: 0; }
+  .form-inner { max-width: 760px; }
+  label.f { display: block; margin-bottom: 16px; }
+  label.f > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  input[type=text], input[type=date], input[type=datetime-local], select, textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--fg); font: inherit;
+  }
+  textarea { resize: vertical; line-height: 1.75; }
+  button.act {
+    padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; font-size: 14px;
+  }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.act:disabled { opacity: .5; cursor: not-allowed; }
+  .req { color: #dc2626; }
+
+  /* 评分 */
+  .rate { display: flex; gap: 6px; align-items: center; }
+  .rate button {
+    width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel); cursor: pointer; padding: 0;
+  }
+  .rate button[data-on="1"] { background: var(--accent); border-color: var(--accent); }
+  .rate .clear { width: auto; height: auto; border: none; background: none; color: var(--muted); font-size: 12px; }
+
+  /* 图片 */
+  .drop {
+    border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 22px;
+    text-align: center; color: var(--muted); cursor: pointer; font-size: 14px;
+  }
+  .drop.over { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+  .shot { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .shot img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .shot .cap { padding: 6px 8px; font-size: 11px; color: var(--muted); }
+  .shot input { width: 100%; border: none; border-top: 1px solid var(--border); padding: 5px 8px;
+                background: none; color: var(--fg); font: inherit; font-size: 12px; }
+  .shot .del { width: 100%; border: none; border-top: 1px solid var(--border); padding: 4px;
+               background: none; color: var(--muted); cursor: pointer; font-size: 11px; }
+  .cover-box { display: flex; gap: 12px; align-items: flex-start; }
+  .cover-box img { width: 90px; border-radius: 8px; border: 1px solid var(--border); display: block; }
+
+  .tip { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
+         background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
+  .log { padding: 10px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted);
+         white-space: pre-wrap; max-height: 140px; overflow: auto; }
+  .log b { color: var(--fg); }
+  .log .ok { color: var(--ok); }
+  .log .err { color: #dc2626; }
+  .empty { color: var(--muted); padding: 40px 0; }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="brand">Studio<small>迩迩的小站</small></div>
+    <div class="types" id="types"></div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <div class="main">
+    <div class="bar">
+      <span class="hint" id="hint"></span>
+      <button class="act" id="btn-check">跑一遍校验</button>
+      <button class="act primary" id="btn-save">保存</button>
+      <button class="act" id="btn-commit">提交</button>
+      <button class="act" id="btn-push">发布上线</button>
+    </div>
+    <div class="form" id="form"><p class="empty">左边选一条，或者新建。</p></div>
+    <div class="log" id="log"></div>
+  </div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s);
+let S = null;              // 服务端状态
+let cur = { type: 'moments', id: null, front: {}, body: '', photos: [], cover: null };
+
+const log = (msg, cls = '') => {
+  const el = $('#log');
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  el.innerHTML += `<div><b>${time}</b> <span class="${cls}">${msg}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+};
+const api = async (path, opts) => {
+  const r = await fetch(path, opts);
+  const d = await r.json();
+  if (!r.ok || d.error) throw new Error(d.error ?? ('HTTP ' + r.status));
+  return d;
+};
+
+// ——— 解析已有 md（够用就行：这些文件都是本工具写的） ———
+function parseMd(raw) {
+  const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!m) return { front: {}, body: raw };
+  const front = {};
+  let key = null;
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^(\w+):\s*(.*)$/);
+    if (kv) {
+      key = kv[1];
+      const v = kv[2].trim();
+      front[key] = v === '' ? [] : unquote(v);
+    } else if (key && /^\s+-\s/.test(line)) {
+      if (!Array.isArray(front[key])) front[key] = [];
+      front[key].push(unquote(line.replace(/^\s+-\s*/, '')));
+    }
+  }
+  return { front, body: m[2].trim() };
+}
+const unquote = (s) => s.replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"');
+
+// photos 是嵌套结构，上面那个浅解析器还原不出来。
+// 编辑已有 moment 时从原文里把 photos 段整体抠出来，只解析到「有哪几张图 + alt」，
+// EXIF 原样保留 —— 重新保存时不会把相机信息弄丢。
+function parsePhotos(raw) {
+  const seg = raw.match(/^photos:\n([\s\S]*?)(?=^\w+:|^---)/m);
+  if (!seg) return [];
+  const out = [];
+  for (const block of seg[1].split(/^\s+- /m).slice(1)) {
+    const src = block.match(/src:\s*(.+)/)?.[1]?.trim();
+    const alt = unquote(block.match(/alt:\s*(.+)/)?.[1]?.trim() ?? '');
+    const exif = {};
+    for (const k of ['camera', 'lens', 'focal', 'aperture', 'shutter', 'iso']) {
+      const v = block.match(new RegExp(k + ':\\s*(.+)'))?.[1]?.trim();
+      if (v) exif[k] = k === 'iso' ? Number(unquote(v)) : unquote(v);
+    }
+    if (src) out.push({ src: unquote(src), alt, exif: Object.keys(exif).length ? exif : undefined });
+  }
+  return out;
+}
+
+// ——— 渲染 ———
+function renderTypes() {
+  $('#types').innerHTML = Object.entries(S.types)
+    .map(([k, t]) => `<button data-t="${k}" aria-pressed="${k === cur.type}">${t.label}</button>`).join('');
+  $('#types').onclick = (e) => {
+    const b = e.target.closest('button[data-t]');
+    if (b) { cur.type = b.dataset.t; newEntry(); renderTypes(); renderList(); }
+  };
+  $('#hint').textContent = S.types[cur.type].hint;
+}
+
+function renderList() {
+  const items = S.collections[cur.type] ?? [];
+  $('#list').innerHTML =
+    `<button class="new">＋ 新建</button>` +
+    items.map((e) => {
+      const isDraft = /^draft:\s*true/m.test(e.raw);
+      return `<button data-id="${e.id}" class="${isDraft ? 'draft' : ''}" aria-current="${e.id === cur.id}">${e.title}</button>`;
+    }).join('');
+  $('#list').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.classList.contains('new')) return newEntry();
+    load(b.dataset.id);
+  };
+}
+
+function newEntry() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const localDT = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const today = localDT.slice(0, 10);
+  cur = { type: cur.type, id: null, front: {}, body: '', photos: [], cover: null };
+  for (const f of S.types[cur.type].fields) {
+    if (f.type === 'datetime') cur.front[f.key] = localDT;
+    else if (f.type === 'date') cur.front[f.key] = today;
+    else if (f.type === 'select') cur.front[f.key] = f.options[0].v;
+  }
+  renderForm(); renderList();
+}
+
+function load(id) {
+  const e = (S.collections[cur.type] ?? []).find((x) => x.id === id);
+  if (!e) return;
+  const { front, body } = parseMd(e.raw);
+  cur = {
+    type: cur.type, id,
+    front, body,
+    photos: S.types[cur.type].photos ? parsePhotos(e.raw) : [],
+    cover: front.cover ?? null,
+  };
+  // datetime-local 不认 ISO 里的时区后缀，截到分钟
+  for (const f of S.types[cur.type].fields) {
+    if (f.type === 'datetime' && cur.front[f.key]) cur.front[f.key] = String(cur.front[f.key]).slice(0, 16);
+  }
+  renderForm(); renderList();
+}
+
+function field(f) {
+  const v = cur.front[f.key] ?? '';
+  const req = f.required ? ' <span class="req">*</span>' : '';
+  const head = `<span>${f.label}${req}</span>`;
+  if (f.type === 'select')
+    return `<label class="f">${head}<select data-k="${f.key}">${f.options
+      .map((o) => `<option value="${o.v}"${String(v) === o.v ? ' selected' : ''}>${o.t}</option>`).join('')}</select></label>`;
+  if (f.type === 'textarea')
+    return `<label class="f">${head}<textarea data-k="${f.key}" rows="${f.rows ?? 3}">${escapeHtml(v)}</textarea></label>`;
+  if (f.type === 'date' || f.type === 'datetime')
+    return `<label class="f">${head}<input type="${f.type === 'date' ? 'date' : 'datetime-local'}" data-k="${f.key}" value="${escapeHtml(v)}" /></label>`;
+  if (f.type === 'tags')
+    return `<label class="f">${head}<input type="text" data-k="${f.key}" data-tags="1" value="${escapeHtml(Array.isArray(v) ? v.join(', ') : v)}" placeholder="逗号分隔" /></label>`;
+  if (f.type === 'bool')
+    return `<label class="f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-k="${f.key}" ${String(v) === 'true' || v === true ? 'checked' : ''} style="width:auto" /><span style="margin:0">${f.label}</span></label>`;
+  if (f.type === 'rating') {
+    const n = Number(v) || 0;
+    return `<label class="f">${head}<span class="rate" data-k="${f.key}">${
+      [1, 2, 3, 4, 5].map((i) => `<button type="button" data-v="${i}" data-on="${i <= n ? 1 : 0}"></button>`).join('')
+    }<button type="button" class="clear" data-v="0">不评分</button></span></label>`;
+  }
+  if (f.type === 'ref') {
+    const opts = (S.collections[f.refTo] ?? []).map((e) => `<option value="${e.id}"${v === e.id ? ' selected' : ''}>${e.title}</option>`).join('');
+    return `<label class="f">${head}<select data-k="${f.key}"><option value="">（不关联）</option>${opts}</select></label>`;
+  }
+  return `<label class="f">${head}<input type="text" data-k="${f.key}" value="${escapeHtml(v)}" placeholder="${f.placeholder ?? ''}" /></label>`;
+}
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function renderForm() {
+  const t = S.types[cur.type];
+  const visible = t.fields.filter((f) => !f.onlyWhen || String(cur.front[Object.keys(f.onlyWhen)[0]]) === Object.values(f.onlyWhen)[0]);
+  const mediaDir = t.flat ? t.dir.split('/').pop() : `${t.dir.split('/').pop()}/${cur.id ?? ''}`;
+
+  $('#form').innerHTML = `<div class="form-inner">
+    ${cur.id ? '' : '<div class="tip">新建的条目会在第一次保存时确定文件名。</div>'}
+    ${visible.map(field).join('')}
+    ${t.cover ? `<label class="f"><span>封面</span>
+      <div class="cover-box">
+        ${cur.cover ? `<img src="/media/${mediaDir}/${String(cur.cover).replace('./', '')}" alt="" />` : ''}
+        <div style="flex:1"><div class="drop" id="drop-cover">拖一张封面进来，或点击选择</div></div>
+      </div></label>` : ''}
+    ${t.photos ? `<label class="f"><span>照片</span>
+      <div class="drop" id="drop-photos">把照片拖进来（可多张）。会自动压缩，并读出拍摄时间和相机参数。</div>
+      <div class="shots" id="shots"></div></label>` : ''}
+    ${t.bodyLabel ? `<label class="f"><span>${t.bodyLabel}${t.bodyRequired ? ' <span class="req">*</span>' : ''}</span>
+      <textarea data-body="1" rows="${cur.type === 'essays' ? 16 : 4}">${escapeHtml(cur.body)}</textarea></label>` : ''}
+    ${field({ key: 'draft', label: '存为草稿（线上不显示）', type: 'bool' })}
+  </div>`;
+
+  $('#form').oninput = (e) => {
+    const el = e.target;
+    if (el.dataset.body) { cur.body = el.value; return; }
+    const k = el.dataset.k;
+    if (!k) return;
+    if (el.type === 'checkbox') cur.front[k] = el.checked;
+    else if (el.dataset.tags) cur.front[k] = el.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    else cur.front[k] = el.value;
+    if (k === 'kind') renderForm(); // 书才有「状态」字段
+  };
+  $('#form').onclick = (e) => {
+    const b = e.target.closest('.rate button');
+    if (!b) return;
+    const k = b.closest('.rate').dataset.k;
+    const v = Number(b.dataset.v);
+    cur.front[k] = v || '';
+    renderForm();
+  };
+
+  if (t.photos) { renderShots(); wireDrop('#drop-photos', true); }
+  if (t.cover) wireDrop('#drop-cover', false);
+}
+
+function renderShots() {
+  const t = S.types[cur.type];
+  const dir = `${t.dir.split('/').pop()}/${cur.id ?? ''}`;
+  $('#shots').innerHTML = cur.photos.map((p, i) => `
+    <div class="shot">
+      <img src="/media/${dir}/${String(p.src).replace('./', '')}" alt="" />
+      <input type="text" data-alt="${i}" value="${escapeHtml(p.alt)}" placeholder="alt 描述" />
+      <div class="cap">${p.exif?.camera ? [p.exif.camera, p.exif.focal, p.exif.aperture, p.exif.shutter, p.exif.iso && 'ISO ' + p.exif.iso].filter(Boolean).join(' · ') : '无 EXIF'}</div>
+      <button class="del" data-del="${i}">移除</button>
+    </div>`).join('');
+  $('#shots').oninput = (e) => {
+    const i = e.target.dataset.alt;
+    if (i != null) cur.photos[Number(i)].alt = e.target.value;
+  };
+  $('#shots').onclick = (e) => {
+    const i = e.target.dataset.del;
+    if (i != null) { cur.photos.splice(Number(i), 1); renderShots(); }
+  };
+}
+
+function wireDrop(sel, multi) {
+  const el = $(sel);
+  if (!el) return;
+  const pick = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = multi;
+    inp.onchange = () => upload([...inp.files], multi);
+    inp.click();
+  };
+  el.onclick = pick;
+  el.ondragover = (e) => { e.preventDefault(); el.classList.add('over'); };
+  el.ondragleave = () => el.classList.remove('over');
+  el.ondrop = (e) => {
+    e.preventDefault(); el.classList.remove('over');
+    upload([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')), multi);
+  };
+}
+
+async function upload(files, multi) {
+  if (!files.length) return;
+  // 图片要落到条目自己的目录里，所以未保存的新条目得先落一次盘拿到 slug
+  if (!cur.id) {
+    if (!validate(true)) return;
+    await save({ silent: true });
+  }
+  for (const f of files) {
+    try {
+      log(`上传 ${f.name}…`);
+      const r = await api(`/api/upload?type=${cur.type}&slug=${encodeURIComponent(cur.id)}&name=${encodeURIComponent(f.name)}`,
+        { method: 'POST', body: f });
+      const kb = (n) => Math.round(n / 1024) + 'KB';
+      log(`${f.name} → ${kb(r.before)} 压到 ${kb(r.bytes)}`, 'ok');
+      if (multi) {
+        cur.photos.push({ src: r.src, alt: '', exif: r.exif });
+        // 第一张照片的拍摄时间直接用作这条动态的时间，省得手敲
+        if (r.shotAt && cur.photos.length === 1) {
+          cur.front.date = r.shotAt.slice(0, 16);
+          log('时间已按 EXIF 填成 ' + r.shotAt, 'ok');
+        }
+        if (r.gps && !cur.front.place) log('这张图带 GPS：' + r.gps.lat.toFixed(4) + ', ' + r.gps.lon.toFixed(4) + '（地点仍需自己填）');
+      } else {
+        cur.cover = r.src;
+        cur.front.cover = r.src;
+      }
+    } catch (err) { log(`${f.name} 失败：${err.message}`, 'err'); }
+  }
+  renderForm();
+}
+
+function validate(quiet) {
+  const t = S.types[cur.type];
+  for (const f of t.fields) {
+    if (!f.required) continue;
+    if (f.onlyWhen && String(cur.front[Object.keys(f.onlyWhen)[0]]) !== Object.values(f.onlyWhen)[0]) continue;
+    if (!String(cur.front[f.key] ?? '').trim()) { log(`「${f.label}」还没填`, 'err'); return false; }
+  }
+  if (t.bodyRequired && !cur.body.trim() && !quiet) { log(`「${t.bodyLabel}」还没写`, 'err'); return false; }
+  return true;
+}
+
+function buildFront() {
+  const t = S.types[cur.type];
+  const front = {};
+  for (const f of t.fields) {
+    if (f.onlyWhen && String(cur.front[Object.keys(f.onlyWhen)[0]]) !== Object.values(f.onlyWhen)[0]) continue;
+    let v = cur.front[f.key];
+    if (v === '' || v == null) continue;
+    if (f.type === 'datetime') {
+      // datetime-local 给的是无时区本地时间，补上本机偏移再写进去
+      const d = new Date(v);
+      const off = -d.getTimezoneOffset();
+      const p = (n) => String(Math.floor(Math.abs(n))).padStart(2, '0');
+      v = `${v}:00${off >= 0 ? '+' : '-'}${p(off / 60)}:${p(off % 60)}`;
+    }
+    if (f.type === 'rating') v = Number(v);
+    front[f.key] = v;
+  }
+  if (cur.cover) front.cover = cur.cover;
+  if (S.types[cur.type].photos) front.photos = cur.photos;
+  front.draft = cur.front.draft === true || String(cur.front.draft) === 'true';
+  return front;
+}
+
+async function save({ silent } = {}) {
+  if (!silent && !validate()) return;
+  const r = await api('/api/save', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ type: cur.type, id: cur.id, front: buildFront(), bodyText: cur.body }),
+  });
+  cur.id = r.id;
+  if (!silent) log('已写入 ' + r.file, 'ok');
+  await refresh();
+  return r;
+}
+
+async function refresh() {
+  S = await api('/api/state');
+  renderTypes(); renderList();
+  const g = S.git;
+  // 两个数字含义不同：提交上的是「几个文件改了」，发布上的是「几个提交没推」。
+  // 数字长得一样，靠 title 讲清楚，免得看串。
+  $('#btn-push').textContent = g.ahead > 0 ? `发布上线（${g.ahead}）` : '发布上线';
+  $('#btn-push').title = g.ahead > 0 ? `${g.ahead} 个提交还没推送到线上` : '没有待推送的提交';
+  $('#btn-commit').textContent = g.files.length ? `提交（${g.files.length}）` : '提交';
+  $('#btn-commit').title = g.files.length ? `${g.files.length} 个文件有改动` : '工作区干净';
+}
+
+$('#btn-save').onclick = () => save().catch((e) => log(e.message, 'err'));
+$('#btn-check').onclick = async () => {
+  log('跑 astro check…');
+  const r = await api('/api/check', { method: 'POST' });
+  log(r.ok ? '校验通过' : '校验没过：\n' + r.out, r.ok ? 'ok' : 'err');
+};
+$('#btn-commit').onclick = async () => {
+  const msg = prompt('提交信息', `content: 更新${S.types[cur.type].label}`);
+  if (!msg) return;
+  try { await api('/api/commit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg }) });
+    log('已提交', 'ok'); await refresh();
+  } catch (e) { log(e.message, 'err'); }
+};
+$('#btn-push').onclick = async () => {
+  if (!confirm('推送到 main 会触发 Actions 自动部署，内容会真的上线。确定吗？')) return;
+  try { const r = await api('/api/push', { method: 'POST' }); log('已推送\n' + r.out, 'ok'); await refresh(); }
+  catch (e) { log(e.message, 'err'); }
+};
+
+refresh().then(() => { newEntry(); log('就绪'); }).catch((e) => log(e.message, 'err'));
+</script>
+</body>
+</html>

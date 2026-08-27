@@ -55,7 +55,7 @@ ok('换页后 demo 在 100ms 内完成初始化（不依赖彩蛋是否展开）
 await page.click('details.lab summary');
 await waitInteractive(page, '.piano-keys .key.white');
 // 只按下不松开：松开会正常清掉 .active，那样测不出绑定有没有生效
-const key = await page.locator('.piano-keys .key.white').first();
+const key = page.locator('.piano-keys .key.white').first();
 const box = await key.boundingBox();
 await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 await page.mouse.down();

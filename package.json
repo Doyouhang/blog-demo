@@ -9,7 +9,8 @@
     "fetch:all": "npm run fetch:market && npm run fetch:stocks",
     "check": "astro check",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "studio": "node studio/server.mjs"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.19",
@@ -18,6 +19,9 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
+    "exifr": "^7.1.3",
+    "playwright-core": "^1.62.1",
+    "sharp": "^0.35.4",
     "typescript": "^5.7.0"
   }
 }
