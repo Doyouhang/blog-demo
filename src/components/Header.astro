@@ -24,6 +24,15 @@ const isCurrent = (href: string) => (href === B ? path === B : path.startsWith(h
           </a>
         ))}
       </div>
+      <a
+        class="theme-toggle"
+        href={`${B}search/`}
+        aria-label="搜索站内内容"
+        title="搜索"
+        aria-current={path.startsWith(`${B}search`) ? 'page' : undefined}
+      >
+        <Icon name="search" size={16} />
+      </a>
       <button
         id="theme-toggle"
         class="theme-toggle"

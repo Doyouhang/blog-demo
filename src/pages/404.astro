@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHeader from '../components/PageHeader.astro';
 const B = import.meta.env.BASE_URL;
 ---
-<BaseLayout title="页面不存在" description="你要找的页面不存在" fullWidth>
+<BaseLayout title="页面不存在" description="你要找的页面不存在" fullWidth noIndex>
   <div class="container-wide">
     <PageHeader eyebrow="404" title="这个页面走丢了" lead="链接可能拼错了，或者内容已经挪走。">
       <div class="head-actions">

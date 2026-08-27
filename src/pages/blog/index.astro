@@ -24,7 +24,7 @@ for (const p of posts) {
 }
 const archive = [...years.entries()].sort((a, b) => Number(b[0]) - Number(a[0]));
 ---
-<BaseLayout title="博客" description="记录学习、生活与一些想法" fullWidth>
+<BaseLayout title="博客" description="记录学习、生活与一些想法" fullWidth noIndex>
   <div class="container-wide">
     <PageHeader eyebrow="全部文章" title="博客" lead="记录学习、生活与一些想法。" />
     <div class="split">

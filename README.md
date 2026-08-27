@@ -113,6 +113,9 @@ public/             # 静态资源（favicon 等）
 scripts/
   fetch-stocks.mjs  # 构建期抓自选股行情
   fetch-market.mjs  # 构建期抓大盘复盘数据
+  changelog.mjs     # 从 git 历史生成 CHANGELOG.md
+studio/             # 本地图文编辑器（npm run studio），不参与生产构建
+tests/smoke.mjs     # 浏览器冒烟测试
 ```
 
 改内容改哪个文件，见下面的「内容维护速查」。
@@ -201,6 +204,9 @@ export const OG_IMAGE = 'og.png';
 | 图标 | `src/components/icons.ts` |
 
 改完本地 `npm run dev` 看一眼，没问题就提交推送，Actions 会自动重新部署。
+
+**不想碰文件的话**：`npm run studio` 起本地图文编辑器，图形界面填字段、拖照片、
+一键提交发布。拖进去的照片会自动压缩并读出拍摄时间和相机参数。见 [studio/README.md](studio/README.md)。
 
 ### 写新文章
 
@@ -331,6 +337,40 @@ curl -s -G --data-urlencode "input=中际旭创" \
 
 **图标数据必须放在 `.ts` 文件里，不能写进 `.astro` 的 frontmatter** —— Astro 编译器提升
 `export const` 大对象时会产出坏 JS，报的错还对不上行号，踩过一次。
+
+### 站内搜索
+
+[Pagefind](https://pagefind.app/)，构建期扫 `dist` 生成索引，搜索完全在浏览器里跑，
+零后端、零请求。`npm run build` 已经包含索引生成这一步。
+
+**只有详情页进索引。** 首页、博客列表、标签页、兴趣列表这些索引类页面挂了 `noIndex`，
+因为它们的内容是详情页的重复 —— 都索引进去的话，搜「Astro」第一条弹出来的是标签页
+而不是那篇文章。新增页面时想清楚它属于哪一类。
+
+写法上有个坑：`data-pagefind-body={!noIndex}` 是错的。`data-*` 不是布尔属性，
+`false` 会被渲染成字符串 `"false"`，属性依然存在，而 Pagefind 只看存不存在。
+必须传 `undefined` 才会整个属性都不输出。
+
+中文是按词切分的，所以搜一个长句会匹配到包含其中多数词的页面，这是预期行为，不是 bug。
+
+### 变更记录
+
+```bash
+npm run changelog
+```
+
+从 git 历史生成 `CHANGELOG.md`，按 `feat:` / `fix:` 这类前缀分组、按日期分节，
+每条链回对应的 commit。**别手动改这个文件**，下次生成会覆盖。
+
+提交信息的正文（那些「为什么这么改」的说明）不会进 CHANGELOG —— 它们留在 git 里，
+想看细节点链接就是了。变更记录塞满长段落反而没人读。
+
+### 年度回顾
+
+`/year/2026/` 这类页面自动生成，数据来自三个 collection 的统计：读完的书、
+记下的歌、拍的照片、去过的地方、写的文章，外加一张逐月活跃度柱状图。
+
+**只为有内容的年份生成页面** —— 空年份的回顾页只会是一排零。入口在时间线页的侧栏。
 
 ### 改版面之前：一条排版规则
 

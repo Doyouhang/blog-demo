@@ -1,0 +1,157 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Icon from '../components/Icon.astro';
+---
+<BaseLayout title="搜索" description="站内搜索" fullWidth noIndex>
+  <div class="container-wide">
+    <PageHeader eyebrow="站内" title="搜索" lead="文章、收藏、时间线，都在里面。" />
+
+    <div class="split">
+      <div class="split-main">
+        <div class="box">
+          <Icon name="alert" size={16} />
+          <input
+            type="search"
+            id="q"
+            placeholder="输入关键词…"
+            autocomplete="off"
+            aria-label="搜索站内内容"
+          />
+        </div>
+
+        <p class="state" id="state">正在准备索引…</p>
+        <div id="results"></div>
+      </div>
+
+      <aside>
+        <section class="side-box">
+          <h2>怎么搜</h2>
+          <p class="side-foot">
+            索引在构建时生成，搜索完全在你的浏览器里跑，不请求任何服务器，
+            也不会有人知道你搜了什么。
+          </p>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <style>
+    .box {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 16px; background: var(--card);
+      transition: border-color var(--dur-fast) var(--ease);
+    }
+    .box:focus-within { border-color: var(--accent); }
+    .box :global(svg) { color: var(--muted); flex: 0 0 auto; }
+    #q {
+      flex: 1; border: none; background: none; color: var(--fg);
+      font: inherit; font-size: 16px; outline: none; min-width: 0;
+    }
+    .state { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
+    .hit {
+      display: block; padding: 16px 0; border-bottom: 1px solid var(--border);
+      color: inherit; text-decoration: none;
+    }
+    .hit:hover h3 { color: var(--accent); }
+    .hit h3 { margin: 0 0 4px; font-size: 16px; }
+    .hit .url { color: var(--muted); font-size: 12px; margin: 0 0 6px; }
+    .hit .ex { margin: 0; font-size: 14px; line-height: 1.75; color: var(--muted); }
+    .hit :global(mark) {
+      background: var(--accent-weak); color: var(--accent);
+      padding: 0 2px; border-radius: 3px;
+    }
+  </style>
+
+  <script>
+    import { onPageReady, markReady } from '../scripts/init';
+
+    const B = import.meta.env.BASE_URL;
+
+    interface Hit {
+      url: string;
+      excerpt: string;
+      meta: Record<string, string>;
+    }
+
+    function initSearch() {
+      const inputMaybe = document.getElementById('q') as HTMLInputElement | null;
+      const stateMaybe = document.getElementById('state');
+      const boxMaybe = document.getElementById('results');
+      if (!inputMaybe || !stateMaybe || !boxMaybe) return;
+      if (!markReady(inputMaybe)) return;
+      // 固化成非空常量：上面的判空进不了下面的闭包，
+      // TS 在异步回调里会重新把它们当成可能为 null。
+      const input = inputMaybe;
+      const state = stateMaybe;
+      const box = boxMaybe;
+
+      let pf: any = null;
+      let seq = 0;
+
+      // 索引是构建产物，dev 模式下不存在 —— 这里必须能优雅降级，
+      // 否则本地开发一进这个页面就是一片红。
+      const ready = (async () => {
+        try {
+          pf = await import(/* @vite-ignore */ `${B}pagefind/pagefind.js`);
+          await pf.init();
+          state.textContent = '';
+          input.disabled = false;
+          return true;
+        } catch {
+          state.textContent = '本地开发模式下没有搜索索引。跑一次 npm run build 就有了。';
+          input.disabled = true;
+          return false;
+        }
+      })();
+
+      const esc = (s: string) =>
+        s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+
+      async function run(q: string) {
+        if (!(await ready)) return;
+        // 输入很快时会有多次并发查询，只认最后一次的结果，避免旧结果盖掉新的
+        const mine = ++seq;
+        if (!q.trim()) {
+          box.innerHTML = '';
+          state.textContent = '';
+          return;
+        }
+        state.textContent = '搜索中…';
+        const r = await pf.search(q);
+        if (mine !== seq) return;
+
+        const hits: Hit[] = await Promise.all(r.results.slice(0, 20).map((x: any) => x.data()));
+        if (mine !== seq) return;
+
+        state.textContent = hits.length ? `找到 ${r.results.length} 条` : '没有匹配的内容。';
+        box.innerHTML = hits
+          .map(
+            (h) => `<a class="hit" href="${h.url}">
+              <h3>${esc(h.meta?.title ?? h.url)}</h3>
+              <p class="url">${esc(h.url)}</p>
+              <p class="ex">${h.excerpt}</p>
+            </a>`
+          )
+          .join('');
+      }
+
+      let timer: number | undefined;
+      input.addEventListener('input', () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => run(input.value), 160);
+      });
+
+      // 支持 /search/?q=xxx 直接进来就搜，方便从别处跳过来
+      const q0 = new URLSearchParams(location.search).get('q');
+      if (q0) {
+        input.value = q0;
+        run(q0);
+      }
+      input.focus();
+    }
+
+    onPageReady(initSearch);
+  </script>
+</BaseLayout>

@@ -14,6 +14,11 @@ interface Props {
   fullWidth?: boolean;
   /** 文章页传发布时间，用于 article:published_time */
   publishedAt?: Date;
+  /**
+   * 不进站内搜索索引。索引类页面（列表、标签、首页）的内容是详情页的重复，
+   * 索引进去只会稀释结果、还抢排名 —— 搜「Astro」第一条弹出标签页而不是文章。
+   */
+  noIndex?: boolean;
 }
 const {
   title = SITE_TITLE,
@@ -21,6 +26,7 @@ const {
   ogType = 'website',
   publishedAt,
   fullWidth = false,
+  noIndex = false,
 } = Astro.props;
 
 const pageTitle = title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
@@ -79,7 +85,12 @@ const ogImage = OG_IMAGE && Astro.site ? new URL(`${B}${OG_IMAGE}`, Astro.site).
   </head>
   <body>
     <Header />
-    <main class:list={[!fullWidth && 'container']}>
+    {/* data-pagefind-body：只索引正文。不标的话导航和页脚会进每一页的索引，
+        搜任何一个导航词都会命中全站，搜索结果就废了。 */}
+    {/* 注意：不能写 data-pagefind-body={!noIndex} —— data-* 不是布尔属性，
+        false 会被渲染成字符串 "false"，属性依然存在，Pagefind 只看存不存在，
+        于是照样索引。必须给 undefined 才会整个属性都不输出。 */}
+    <main class:list={[!fullWidth && 'container']} data-pagefind-body={noIndex ? undefined : true}>
       <slot />
     </main>
     <Footer />

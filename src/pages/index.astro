@@ -29,7 +29,7 @@ const maxAbs = Math.max(...rows.map((r) => Math.abs(r.percent!)), 0.5);
 const dirOf = (n: number) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');
 const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
 ---
-<BaseLayout fullWidth>
+<BaseLayout fullWidth noIndex>
   <div class="container-wide">
     <section class="intro">
       <div class="avatar" aria-hidden="true">迩</div>

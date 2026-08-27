@@ -24,7 +24,7 @@ export async function getStaticPaths() {
 const { tag, tags, posts } = Astro.props;
 const B = import.meta.env.BASE_URL;
 ---
-<BaseLayout title={`标签：${tag}`} description={`标签为「${tag}」的文章`} fullWidth>
+<BaseLayout title={`标签：${tag}`} description={`标签为「${tag}」的文章`} fullWidth noIndex>
   <div class="container-wide">
     <PageHeader
       eyebrow="← 返回博客"

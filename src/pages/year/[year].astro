@@ -1,0 +1,175 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import Icon from '../../components/Icon.astro';
+import { getCollection } from 'astro:content';
+
+// 有内容的年份才生成页面 —— 空年份的回顾页只会是一排零，没有意义
+export async function getStaticPaths() {
+  const [essays, items, moments] = await Promise.all([
+    getCollection('essays', ({ data }) => !data.draft),
+    getCollection('items', ({ data }) => !data.draft),
+    getCollection('moments', ({ data }) => !data.draft),
+  ]);
+
+  const years = new Set<number>();
+  for (const e of essays) years.add(e.data.pubDate.getFullYear());
+  for (const i of items) years.add(i.data.date.getFullYear());
+  for (const m of moments) years.add(m.data.date.getFullYear());
+
+  return [...years].map((year) => ({
+    params: { year: String(year) },
+    props: {
+      year,
+      essays: essays.filter((e) => e.data.pubDate.getFullYear() === year),
+      items: items.filter((i) => i.data.date.getFullYear() === year),
+      moments: moments.filter((m) => m.data.date.getFullYear() === year),
+      allYears: [...years].sort((a, b) => b - a),
+    },
+  }));
+}
+
+const { year, essays, items, moments, allYears } = Astro.props;
+const B = import.meta.env.BASE_URL;
+
+const books = items.filter((i) => i.data.kind === 'book' && (i.data.status ?? 'done') === 'done');
+const songs = items.filter((i) => i.data.kind === 'song');
+const photos = moments.reduce((n, m) => n + m.data.photos.length, 0);
+const places = [...new Set(moments.map((m) => m.data.place).filter((p): p is string => !!p))];
+
+// 每月活跃度：把三种内容合到一起算，看得出哪几个月在认真记录
+const months = Array.from({ length: 12 }, (_, i) => {
+  const inMonth = (d: Date) => d.getMonth() === i;
+  return {
+    m: i + 1,
+    n: essays.filter((e) => inMonth(e.data.pubDate)).length +
+       items.filter((x) => inMonth(x.data.date)).length +
+       moments.filter((x) => inMonth(x.data.date)).length,
+  };
+});
+const peak = Math.max(...months.map((x) => x.n), 1);
+
+const rated = items.filter((i) => i.data.rating != null);
+const topRated = [...rated].sort((a, b) => (b.data.rating ?? 0) - (a.data.rating ?? 0)).slice(0, 5);
+
+const stats = [
+  { icon: 'book' as const, n: books.length, unit: '本', label: '读完的书' },
+  { icon: 'headphones' as const, n: songs.length, unit: '首', label: '记下的歌' },
+  { icon: 'camera' as const, n: photos, unit: '张', label: '拍的照片' },
+  { icon: 'map' as const, n: places.length, unit: '个', label: '去过的地方' },
+  { icon: 'code' as const, n: essays.length, unit: '篇', label: '写的文章' },
+];
+const total = stats.reduce((n, s) => n + s.n, 0);
+---
+<BaseLayout title={`${year} 年回顾`} description={`${year} 年读了什么、去了哪、写了些什么。`} fullWidth noIndex>
+  <div class="container-wide">
+    <PageHeader eyebrow="回顾" title={`${year}`} lead={`这一年攒下的 ${total} 条记录。`} />
+
+    {total === 0 ? (
+      <p class="muted">这一年还没有记录。</p>
+    ) : (
+      <>
+        <div class="stats">
+          {stats.map((s) => (
+            <div class="stat">
+              <Icon name={s.icon} size={18} />
+              <b>{s.n}</b>
+              <span class="unit">{s.unit}</span>
+              <span class="cap">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <section class="block">
+          <h2>什么时候在记录</h2>
+          <div class="months" role="img" aria-label={`${year} 年逐月记录条数`}>
+            {months.map((x) => (
+              <div class="mo">
+                <div class="bar" style={`height:${x.n ? Math.max(8, (x.n / peak) * 100) : 2}%`}
+                     title={`${x.m} 月：${x.n} 条`}></div>
+                <span>{x.m}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {topRated.length > 0 && (
+          <section class="block">
+            <h2>打分最高的</h2>
+            {topRated.map((i) => (
+              <div class="row">
+                <span class="t">{i.data.kind === 'book' ? `《${i.data.title}》` : i.data.title}</span>
+                <span class="c">{i.data.creator}</span>
+                <span class="r" aria-label={`${i.data.rating} 分`}>
+                  {Array.from({ length: 5 }, (_, k) => (
+                    <i class:list={['pip', k < (i.data.rating ?? 0) && 'on']} aria-hidden="true"></i>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {places.length > 0 && (
+          <section class="block">
+            <h2>去过的地方</h2>
+            <div class="chips">{places.map((p) => <span class="chip">{p}</span>)}</div>
+          </section>
+        )}
+      </>
+    )}
+
+    {allYears.length > 1 && (
+      <nav class="years" aria-label="其他年份">
+        {allYears.map((y) => (
+          <a href={`${B}year/${y}/`} aria-current={y === year ? 'page' : undefined}>{y}</a>
+        ))}
+      </nav>
+    )}
+  </div>
+
+  <style>
+    .stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+    }
+    .stat {
+      background: var(--card); padding: 18px 16px;
+      display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+    }
+    .stat :global(svg) { color: var(--accent); align-self: center; }
+    .stat b { font-size: 28px; font-variant-numeric: tabular-nums; }
+    .stat .unit { color: var(--muted); font-size: 13px; }
+    .stat .cap { flex: 1 0 100%; color: var(--muted); font-size: 13px; }
+
+    .block { margin-top: 36px; }
+    .block h2 { font-size: 16px; margin: 0 0 14px; }
+
+    .months { display: flex; align-items: flex-end; gap: 6px; height: 110px; }
+    .mo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+    .mo .bar { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; opacity: .85; }
+    .mo span { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+    .row {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .row .t { font-weight: 500; }
+    .row .c { color: var(--muted); font-size: 13px; margin-right: auto; }
+    .row .r { display: inline-flex; gap: 3px; }
+    .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+    .pip.on { background: var(--accent); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+
+    .years { display: flex; gap: 8px; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .years a {
+      padding: 5px 14px; border: 1px solid var(--border); border-radius: 999px;
+      color: var(--muted); text-decoration: none; font-size: 14px;
+    }
+    .years a[aria-current='page'] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    .muted { color: var(--muted); }
+  </style>
+</BaseLayout>

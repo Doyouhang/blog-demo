@@ -180,6 +180,33 @@ const bindCount = await page.evaluate(() => {
 });
 ok('没有重复绑定事件', bindCount === 1, `pointerdown 触发 ${bindCount} 次`);
 
+// ——— 站内搜索 ———
+await page.goto(BASE + '/search/', { waitUntil: 'networkidle' });
+await page.waitForFunction(() => !document.getElementById('q')?.disabled, null, { timeout: 8000 });
+ok('搜索索引加载成功', true);
+
+const doSearch = async (q) => {
+  await page.fill('#q', '');
+  await page.fill('#q', q);
+  await page.waitForTimeout(500);
+  return page.evaluate(() => [...document.querySelectorAll('.hit')].map((a) => a.getAttribute('href')));
+};
+
+const rAstro = await doSearch('Astro');
+ok('搜得到文章', rAstro.length > 0, rAstro.length + ' 条');
+// 索引页（标签、列表、首页）不该进索引 —— 它们的内容是详情页的重复，
+// 会稀释结果还抢排名。以前搜 Astro 第一条弹的是标签页。
+ok('结果里没有标签页/列表页', !rAstro.some((u) => /\/tags\/|\/blog\/$|\/interests\/$|^\/$/.test(u)), rAstro[0] ?? '');
+ok('第一条是详情页', /\/blog\/[^/]+\/$/.test(rAstro[0] ?? ''), rAstro[0] ?? '');
+
+const rZh = await doSearch('周末');
+ok('中文能搜到', rZh.some((u) => u.includes('/blog/weekend/')), rZh[0] ?? '');
+
+// 注意：中文是按词切分的，搜一个长句会匹配到包含其中多数词的页面，那是预期行为。
+// 要测「无结果」分支得用真正不存在的字串。
+const rNone = await doSearch('zzzzqqqq');
+ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
+
 ok('运行期间无 JS 报错', errors.length === 0, errors.slice(0, 3).join(' | '));
 
 await browser.close();
