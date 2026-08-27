@@ -1,0 +1,225 @@
+---
+// 大盘复盘卡片。数据由 scripts/fetch-market.mjs 在构建期抓好写进 src/data/market.json，
+// 页面不请求外网 —— 和股票行情同一套路子。
+import marketData from '../data/market.json';
+import Icon from './Icon.astro';
+
+interface IndexRow { name: string; price: number; change: number; percent: number; amount: number; market: string }
+interface Sector { code: string; name: string; percent: number }
+interface MarketData {
+  source: string;
+  generatedAt: string;
+  stale?: boolean;
+  /** 0–100，上涨板块占比。50 是多空平衡点 */
+  temperature: number;
+  mood: { key: string; label: string; note: string };
+  breadth: { up: number; down: number; flat: number; total: number };
+  /** 两市成交额，单位元 */
+  turnover: number;
+  indices: IndexRow[];
+  leaders: Sector[];
+  laggards: Sector[];
+}
+
+const m = marketData as MarketData;
+const hasData = m.breadth.total > 0;
+
+const updated = new Date(m.generatedAt).toLocaleString('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  hour12: false,
+});
+
+const dirOf = (n: number) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');
+const sign = (n: number, digits = 2) => (n > 0 ? '+' : '') + n.toFixed(digits);
+// 万亿以下用亿显示，否则小数点后两位的「0.85 万亿」读起来别扭
+const money = (yuan: number) =>
+  yuan >= 1e12 ? `${(yuan / 1e12).toFixed(2)} 万亿` : `${Math.round(yuan / 1e8)} 亿`;
+
+const { up, down, flat, total } = m.breadth;
+// 三段宽度条：直接按家数占比铺，比水温数字更直观地看出分化程度。
+// 顺序刻意是「跌 | 平 | 涨」而不是中文习惯的「涨跌」—— 它紧贴在水温条下面，
+// 水温条是左冷右热，两条方向必须一致，否则红绿位置相反，扫一眼会读反。
+const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+---
+{!hasData && (
+  <div class="demo-card pulse">
+    <div class="pulse-hd">
+      <h2><Icon name="chart" size={16} /> 今日复盘</h2>
+    </div>
+    <div class="sample-tip">
+      <Icon name="alert" size={15} /> 还没有抓到大盘数据。构建时会自动去取，下一次部署完成后这里就会有内容。
+    </div>
+  </div>
+)}
+
+{hasData && (
+  <div class="demo-card pulse">
+    <div class="pulse-hd">
+      <h2><Icon name="chart" size={16} /> 今日复盘</h2>
+      <span class="when">{updated}</span>
+    </div>
+
+    {m.stale && (
+      <div class="sample-tip">
+        <Icon name="alert" size={15} /> 这次构建没能连上行情接口，下面是上一次抓到的大盘数据（{updated}）。
+      </div>
+    )}
+
+    <div class="temp">
+      <div class="temp-num">
+        <b class={dirOf(m.temperature - 50)}>{m.temperature}</b><i>°</i>
+      </div>
+      <div class="temp-body">
+        <div class="temp-top">
+          <strong>{m.mood.label}</strong>
+          <span>{m.mood.note}</span>
+        </div>
+        <div class="gauge" role="img" aria-label={`市场水温 ${m.temperature} 度，${m.mood.label}`}>
+          <div class="gauge-track"></div>
+          <div class="gauge-pin" style={`left:${m.temperature}%`}></div>
+        </div>
+        <div class="gauge-scale" aria-hidden="true">
+          <span>普跌</span><span>分化</span><span>普涨</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="breadth">
+      <div class="bar" role="img" aria-label={`${total} 个行业板块中 ${up} 涨 ${down} 跌 ${flat} 平`}>
+        <i class="down" style={`width:${pct(down)}%`}></i>
+        <i class="flat" style={`width:${pct(flat)}%`}></i>
+        <i class="up" style={`width:${pct(up)}%`}></i>
+      </div>
+      <p class="breadth-txt">
+        <span class="down">{down} 跌</span> · <span class="flat">{flat} 平</span> · <span class="up">{up} 涨</span>
+        <em>（{total} 个行业板块）</em>
+        {m.turnover > 0 && <em>两市成交 {money(m.turnover)}</em>}
+      </p>
+    </div>
+
+    {m.indices.length > 0 && (
+      <div class="idx">
+        {m.indices.map((i) => (
+          <div class="idx-cell">
+            <span class="idx-name">{i.name}</span>
+            <b class={`idx-val ${dirOf(i.percent)}`}>{i.price.toFixed(2)}</b>
+            <span class={`idx-pct ${dirOf(i.percent)}`}>{sign(i.percent)}%</span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {m.leaders.length > 0 && (
+      <div class="sectors">
+        <div class="sec-line">
+          <span class="sec-tag up">领涨</span>
+          {m.leaders.map((s) => (
+            <span class="chip"><b>{s.name}</b><i class="up">{sign(s.percent)}%</i></span>
+          ))}
+        </div>
+        <div class="sec-line">
+          <span class="sec-tag down">领跌</span>
+          {m.laggards.map((s) => (
+            <span class="chip"><b>{s.name}</b><i class={dirOf(s.percent)}>{sign(s.percent)}%</i></span>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <p class="footnote">
+      水温 = 上涨板块 ÷（上涨 + 下跌），平盘不计入，50 为多空平衡点。数据为延迟行情，仅供兴趣展示。
+    </p>
+  </div>
+)}
+
+<style>
+  .pulse-hd {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .pulse-hd h2 {
+    margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px;
+  }
+  .pulse-hd .when { color: var(--muted); font-size: 13px; }
+
+  /* 水温 */
+  .temp { display: flex; gap: 18px; align-items: center; }
+  .temp-num { display: flex; align-items: baseline; line-height: 1; }
+  .temp-num b { font-size: 46px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .temp-num i { font-size: 20px; font-style: normal; color: var(--muted); margin-left: 2px; }
+  .temp-body { flex: 1; min-width: 0; }
+  .temp-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .temp-top strong { font-size: 15px; }
+  .temp-top span { color: var(--muted); font-size: 13px; }
+
+  .gauge { position: relative; height: 8px; }
+  .gauge-track {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--down) 0%, var(--flat) 50%, var(--up) 100%);
+    opacity: .55;
+  }
+  .gauge-pin {
+    position: absolute; top: -3px; width: 3px; height: 14px; border-radius: 2px;
+    background: var(--fg); transform: translateX(-50%);
+    box-shadow: 0 0 0 2px var(--card);
+  }
+  .gauge-scale {
+    display: flex; justify-content: space-between;
+    color: var(--muted); font-size: 11px; margin-top: 6px;
+  }
+
+  /* 板块宽度 */
+  .breadth { margin-top: 20px; }
+  .bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: var(--code-bg); }
+  .bar i { display: block; height: 100%; }
+  .bar .up { background: var(--up); }
+  .bar .down { background: var(--down); }
+  .bar .flat { background: var(--border); }
+  .breadth-txt {
+    margin: 10px 0 0; font-size: 13px; color: var(--muted);
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline;
+  }
+  .breadth-txt em { font-style: normal; }
+  .breadth-txt .up, .breadth-txt .down { font-weight: 600; }
+
+  /* 指数 */
+  .idx {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px; margin-top: 20px;
+    background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .idx-cell {
+    background: var(--card); padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .idx-name { color: var(--muted); font-size: 12px; }
+  .idx-val { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .idx-pct { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  /* 领涨领跌 */
+  .sectors { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+  .sec-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sec-tag { font-size: 12px; font-weight: 600; flex: 0 0 auto; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+    font-size: 13px;
+  }
+  .chip b { font-weight: 500; }
+  .chip i { font-style: normal; font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .flat { color: var(--flat); }
+
+  .sample-tip {
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg);
+    border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
+  }
+  .footnote { color: var(--muted); font-size: 12px; margin: 16px 0 0; }
+
+  @media (max-width: 520px) {
+    .temp { gap: 14px; }
+    .temp-num b { font-size: 38px; }
+  }
+</style>

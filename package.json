@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "fetch:stocks": "node scripts/fetch-stocks.mjs",
+    "fetch:market": "node scripts/fetch-market.mjs",
+    "fetch:all": "npm run fetch:market && npm run fetch:stocks",
     "check": "astro check",
     "build": "astro build",
     "preview": "astro preview"

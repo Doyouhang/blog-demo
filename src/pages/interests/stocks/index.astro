@@ -1,6 +1,7 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
 import Icon from '../../../components/Icon.astro';
+import MarketPulse from '../../../components/MarketPulse.astro';
 import stockData from '../../../data/stocks.json';
 
 interface StockRow {
@@ -45,8 +46,10 @@ const signed = (n: number, dir: Direction, digits = 2) =>
 
 const okRows = rows.filter((r) => r.ok);
 ---
-<InterestLayout icon="chart" title="股票" description="A股 + 港股自选股看板：行情在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
-  <div class="demo-card">
+<InterestLayout icon="chart" title="股票" description="每日大盘复盘 + A股/港股自选股看板：数据在每次构建时抓取，由 GitHub Actions 定时重建刷新。">
+  <MarketPulse />
+
+  <div class="demo-card" style="margin-top:18px">
     <div class="stocks-bar">
       <span>{okRows.length} 只自选 · {isSample ? '示例数据' : '东方财富行情'}</span>
       <span>更新于 {updated}（北京时间）</span>
@@ -103,17 +106,6 @@ const okRows = rows.filter((r) => r.ok);
     <p class="footnote">A股习惯红涨绿跌，平盘走灰。标了 <span class="mkt">HK$</span> 的是港股，价格为港元，其余为人民币；跨币种不做换算，涨跌幅本身与币种无关。行情为延迟数据，仅供兴趣展示，不构成投资建议。</p>
   </div>
 
-  <div class="demo-card" style="margin-top:18px">
-    <h2>这块数据是怎么刷新的？</h2>
-    <ol class="steps">
-      <li>自选清单维护在 <code>src/data/stocks.watchlist.json</code>；</li>
-      <li>每次构建前，<code>npm run fetch:stocks</code> 从东方财富的免费行情接口抓一次数据，写进 <code>src/data/stocks.json</code>；</li>
-      <li>GitHub Actions 在交易日收盘后定时重新构建部署，页面数据就自动更新了；</li>
-      <li>万一接口抓不到，构建不会失败——沿用上一份数据，并在上面挂一条提示。</li>
-    </ol>
-    <p class="footnote">想加股票？往 watchlist 里添一行，secid 规则：沪市 <code>1.代码</code>，深市 <code>0.代码</code>，港股 <code>116.代码</code>（五位，如 <code>116.09988</code>）。</p>
-  </div>
-
   <style>
     .stocks-bar {
       display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
@@ -147,10 +139,5 @@ const okRows = rows.filter((r) => r.ok);
     .flat { color: var(--flat); }
     .muted-cell { color: var(--muted); }
     .footnote { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
-    .steps { margin: 10px 0 0; padding-left: 22px; line-height: 2; }
-    .steps code, .footnote code {
-      background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
-    }
   </style>
 </InterestLayout>

@@ -67,12 +67,21 @@ npm ci --registry=https://registry.npmmirror.com
 
 ```bash
 npm ci
-npm run fetch:stocks              # 抓行情，正常会打印「已更新 8/8 条行情」
+npm run check                     # 类型检查，应当 0 error
+npm run fetch:all                 # 抓大盘 + 行情，正常会打印水温和「已更新 12/12 条行情」
 SITE_BASE=/blog-demo/ npm run build
 ```
 
 `dist/` 下出现 `index.html`、`blog/`、`interests/`、`rss.xml` 就说明环境没问题。
-注意 `fetch:stocks` 会改写 `src/data/stocks.json`，本地调试完记得 `git checkout -- src/data/stocks.json` 还原。
+
+注意 `fetch:all` 会改写 `src/data/stocks.json` 和 `src/data/market.json`。这两份是提交进仓库的
+「种子数据」—— 只是本地试跑的话，调试完记得还原：
+
+```bash
+git checkout -- src/data/stocks.json src/data/market.json
+```
+
+真正换了自选股清单、或想把最新快照带进仓库时，才需要连它们一起提交。
 
 ## 本地开发
 
@@ -94,14 +103,19 @@ src/
   components/       # 头部、底部等组件
   data/
     interests.ts    # 兴趣列表的唯一数据源（首页和兴趣页都读它）
+    now.json        # 首页「此刻」的近况条目
     stocks.*.json   # 股票自选清单 + 抓下来的行情快照
+    market.json     # 大盘复盘快照（水温 / 指数 / 领涨板块）
   scripts/init.ts   # 页面脚本初始化助手（跨页转场下的时机问题，见下）
   utils/            # 小工具函数（阅读时长估算等）
   styles/global.css # 全局样式与设计令牌（含暗色主题）
 public/             # 静态资源（favicon 等）
 scripts/
-  fetch-stocks.mjs  # 构建期抓行情
+  fetch-stocks.mjs  # 构建期抓自选股行情
+  fetch-market.mjs  # 构建期抓大盘复盘数据
 ```
+
+改内容改哪个文件，见下面的「内容维护速查」。
 
 ## 主题与动效
 
@@ -138,12 +152,13 @@ onPageReady(initDemo);            // 立刻跑一次 + 之后每次 page-load �
 另外：View Transitions 在转场动画播放期间会用快照层盖住页面，这大约 250ms 内点击落不到真实元素上。
 这是该 API 的固有行为，不是 bug。
 
-## 股票行情与构建容错
+## 行情数据与构建容错
 
-`scripts/fetch-stocks.mjs` 在构建前抓一次东方财富的免费接口（无需 key），写进 `src/data/stocks.json`，
-页面直接读这个 JSON，运行时零外部请求。
+`scripts/fetch-market.mjs`（大盘复盘）和 `scripts/fetch-stocks.mjs`（自选股行情）在构建前各抓一次
+东方财富的免费接口（无需 key），分别写进 `src/data/market.json` 和 `src/data/stocks.json`。
+页面直接读这两个 JSON，运行时零外部请求。
 
-**这个脚本不会让构建失败。** 行情接口是第三方服务，从 GitHub 的海外 runner 上偶尔连不上；
+**这两个脚本都不会让构建失败。** 行情接口是第三方服务，从 GitHub 的海外 runner 上偶尔连不上；
 一个兴趣页的数据源抖动不该把整个站点一起带下线。它的降级顺序是：
 
 1. 抓取失败 → 最多重试 3 次；
@@ -151,6 +166,15 @@ onPageReady(initDemo);            // 立刻跑一次 + 之后每次 page-load �
 3. 连历史数据都没有 → 写一份占位数据（`source: "sample"`），页面显示「示例数据」提示。
 
 任何一种情况退出码都是 0，站点照常部署。
+
+`fetch-stocks.mjs` 沿用旧数据时还会**按当前清单重排**：从 watchlist 删掉的股票不会再冒出来，
+新加的显示「暂无数据」，等下次抓到再补。所以改完清单就算当场抓不到，页面也不会显示错的票。
+
+本地想一次跑完两个：`npm run fetch:all`。
+
+> 东财接口有限流：短时间内连打几十次请求后会**稳定**返回连接被关闭，容易误判成「接口挂了」或
+> 「我的清单写错了」。等几分钟自然恢复。另外用 curl 手工验证时记得加 `--http1.1`，
+> 默认的 HTTP/2 在这个域名上会握手失败（Node 的 fetch 默认就是 1.1，不受影响）。
 
 ## 分享预览图（可选）
 
@@ -161,14 +185,31 @@ onPageReady(initDemo);            // 立刻跑一次 + 之后每次 page-load �
 export const OG_IMAGE = 'og.png';
 ```
 
-## 写新文章
+## 内容维护速查
 
-在 `src/content/posts/` 新建一个 `.md` 文件，头部写好 frontmatter：
+日常更新基本不用碰页面代码，改一个数据文件就行。先按「我想改什么」查表：
+
+| 我想改…… | 改这个文件 |
+| --- | --- |
+| 站名、作者、分享预览图 | `src/consts.ts` |
+| 首页「此刻」在读什么、在听什么 | `src/data/now.json` |
+| 兴趣卡片（增 / 删 / 改文案） | `src/data/interests.ts` |
+| 自选股清单 | `src/data/stocks.watchlist.json` |
+| 发文章、改标签 | `src/content/posts/*.md` |
+| 关于页正文 | `src/pages/about.astro` |
+| 配色、圆角、动效时长 | `src/styles/global.css` 顶部的设计令牌 |
+| 图标 | `src/components/icons.ts` |
+
+改完本地 `npm run dev` 看一眼，没问题就提交推送，Actions 会自动重新部署。
+
+### 写新文章
+
+在 `src/content/posts/` 新建一个 `.md`，头部写好 frontmatter：
 
 ```md
 ---
 title: 文章标题
-description: 一句话简介
+description: 一句话简介，会显示在列表和分享卡片里
 pubDate: 2026-08-03
 tags: ['标签1', '标签2']
 draft: false
@@ -176,6 +217,137 @@ draft: false
 
 正文用 Markdown 写……
 ```
+
+- `draft: true` 的文章不会出现在列表、标签页和 RSS 里，适合写一半先存着。
+- 标签不用登记，写进 `tags` 就自动出现在标签云和 `/blog/tags/<标签>/` 页面。
+- 文件名就是 URL：`hello.md` → `/blog/hello/`。用英文短横线命名，别用中文和空格。
+
+### 首页「此刻」
+
+`src/data/now.json`，改完就生效：
+
+```json
+{
+  "updatedAt": "2026-08-26",
+  "items": [
+    { "icon": "book", "text": "在读《置身事内》" }
+  ]
+}
+```
+
+`icon` 必须是 `src/components/icons.ts` 里已有的名字，写错了构建时就会报错，不会等到线上才发现。
+`updatedAt` 是手写的，改内容记得一起改，不然页面上的日期会骗人。
+
+条数没有硬限制，但侧栏放 3～4 条最好看，多了会把右边那一列拉得比文章列表还长。
+
+### 兴趣：加一个新的
+
+两步：
+
+1. 往 `src/data/interests.ts` 的数组里加一项（首页卡片和 `/interests/` 列表都从这里读，只改这一处）：
+
+   ```ts
+   { icon: 'map', slug: 'travel', title: '旅行',
+     desc: '一句话介绍。',
+     tags: ['标签1', '标签2'] },
+   ```
+
+2. 新建 `src/pages/interests/<slug>/index.astro`，套 `InterestLayout`：
+
+   ```astro
+   ---
+   import InterestLayout from '../../../layouts/InterestLayout.astro';
+   ---
+   <InterestLayout icon="map" title="旅行" description="一句话描述">
+     <div class="demo-card">……</div>
+   </InterestLayout>
+   ```
+
+`slug` 必须和目录名一致，否则首页卡片会点进 404。首页兴趣区是**全部展示**、不分页的，
+加到十几个会把那一整条色带撑得很长，到时候再考虑折叠。
+
+如果这个兴趣页要写交互脚本，务必用 `src/scripts/init.ts` 的 `onPageReady`，原因见上面那节坑。
+
+### 自选股：加减股票
+
+只改 `src/data/stocks.watchlist.json`，一只一行：
+
+```json
+{ "secid": "0.300308", "code": "300308", "name": "中际旭创" }
+```
+
+`secid` 的前缀就是东方财富的市场号：
+
+| 市场 | 前缀 | 例子 |
+| --- | --- | --- |
+| 深市（含创业板） | `0.` | `0.300308` |
+| 沪市（含科创板） | `1.` | `1.688008` |
+| 港股（代码五位） | `116.` | `116.09988` |
+
+**别凭印象填代码。** 简称和你记的经常对不上（比如 `688347` 东财叫「华虹宏力」不叫「华虹公司」），
+港股还容易混到涡轮牛熊证上去。用东财的搜索接口查一下，一秒钟的事：
+
+```bash
+curl -s -G --data-urlencode "input=中际旭创" \
+  --data "type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=6" \
+  https://searchapi.eastmoney.com/api/suggest/get
+```
+
+返回里的 `MktNum` 就是 secid 前缀，`Code` 是代码，`SecurityTypeName` 告诉你是深A / 沪A / 港股。
+
+习惯上 **A 股排前面、港股排后面**，加票时按这个分组插，别一路追加到末尾。
+
+港股价格是港元，页面会自动在那一行挂个 `HK$` 标签（`currency` 由脚本按市场号判断，不用手填）。
+跨币种不做换算 —— 涨跌幅本身与币种无关，硬凑汇率反而引入每天都在变的假精度。
+
+### 大盘复盘（水温）
+
+股票页顶部那张卡片，数据来自 `scripts/fetch-market.mjs` → `src/data/market.json`，构建期抓一次。
+**不用手工维护**，但两个地方你可能想调：
+
+- **关注哪些指数**：`scripts/fetch-market.mjs` 顶部的 `INDICES` 数组，加减一行即可，
+  secid 规则和自选股一样。
+- **水温的分档和措辞**：同一个文件里的 `MOODS` 数组，改 `label` 和 `note` 就能换说法。
+
+水温的定义是 **上涨板块 ÷（上涨 + 下跌）**，平盘不计入分母，50 是多空平衡点。
+
+指数和板块是**分开抓、分开降级**的：板块走的 `clist` 接口限流比指数严得多（要翻页），
+所以板块抓不到时不会连累指数——页面会显示新指数 + 旧板块，并挂上「部分沿用旧数据」的提示。
+只要有一半是旧的，时间戳就保持旧值不动，免得页面显示「刚刚更新」而实际是半新半旧。
+
+用的是**板块级宽度**而不是个股涨跌家数，这是被接口逼出来的取舍：东财 `clist` 接口的 `pz` 硬上限是
+100，按个股统计全市场要翻五十多页，请求一密必被限流；而行业板块自带的涨跌家数字段没法加总 ——
+496 个板块里一级和细分并存，同一只股票被重复归类，加出来是实际的三倍多。板块级宽度口径自洽、
+一次分页拿全，而且更能看出「热点是普涨还是只集中在几个方向」。
+
+### 图标
+
+全站没有 emoji，图标统一走 `src/components/icons.ts`（24px 网格的实心剪影，颜色继承 `currentColor`）。
+加一个：往 `ICONS` 里添一条 SVG path，`IconName` 类型会自动收敛，名字写错构建期就报错。
+
+```astro
+<Icon name="camera" size={18} />
+```
+
+**图标数据必须放在 `.ts` 文件里，不能写进 `.astro` 的 frontmatter** —— Astro 编译器提升
+`export const` 大对象时会产出坏 JS，报的错还对不上行号，踩过一次。
+
+### 改版面之前：一条排版规则
+
+全站只有一条布局规则，加新页面时照着来就不会跑偏：
+
+**索引页 = 宽双栏，阅读页 = 窄单栏。**
+
+- 索引页（首页 / 博客 / 兴趣 / 标签 / 关于）：`<BaseLayout fullWidth>` + `.container-wide`（1120px），
+  骨架用 `.split`（1.75fr : 1fr），窄屏自动塌成单列
+- 阅读页（文章正文）：默认容器 880px，正文再限宽到 720px —— 正文太宽反而难读，这里不跟风
+
+重复的排版已经抽成组件，别再手写一遍：`PageHeader`（页头）、`PostCard`（文章条目，首页/博客/标签共用）、
+`InterestCard`、`TagCloud`、`.side-box`（侧栏卡片）。
+
+**一个坑**：`BaseLayout` 已经渲染了 `<main>`，双栏的左列要用 `div.split-main`。再套一个 `<main>`
+是非法 HTML（一个文档只能有一个 main 地标），而且 `main` 的上下留白会被内层吃到，
+左栏会比右栏矮一截。
 
 ## 部署到 GitHub Pages
 

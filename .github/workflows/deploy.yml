@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # 交易日北京时间 15:47（UTC 07:47）收盘后重建，刷新股票行情
+  # 交易日北京时间 15:47（UTC 07:47）收盘后重建，刷新大盘复盘与股票行情
   schedule:
     - cron: '47 7 * * 1-5'
 
@@ -31,7 +31,9 @@ jobs:
       - run: npm ci
       - name: Type check
         run: npm run check
-      # 抓不到行情也不会失败，脚本会退回上一份数据（页面上会提示）
+      # 这两步抓不到数据也不会失败，脚本会退回上一份（页面上会提示）
+      - name: Fetch market pulse
+        run: npm run fetch:market
       - name: Fetch stock quotes
         run: npm run fetch:stocks
       - run: npm run build

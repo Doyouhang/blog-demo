@@ -1,0 +1,21 @@
+{
+  "source": "sample",
+  "generatedAt": "1970-01-01T00:00:00.000Z",
+  "stale": true,
+  "temperature": 50,
+  "mood": {
+    "key": "mixed",
+    "label": "分化",
+    "note": "涨跌各半，是结构性行情，选股比择时重要"
+  },
+  "breadth": {
+    "up": 0,
+    "down": 0,
+    "flat": 0,
+    "total": 0
+  },
+  "turnover": 0,
+  "indices": [],
+  "leaders": [],
+  "laggards": []
+}
