@@ -1,76 +1,90 @@
 ---
 import InterestLayout from '../../../layouts/InterestLayout.astro';
-import Icon from '../../../components/Icon.astro';
+import ItemCard from '../../../components/ItemCard.astro';
+import DemoToggle from '../../../components/DemoToggle.astro';
+import BookPicker from '../../../components/BookPicker.astro';
+import { getCollection } from 'astro:content';
+
+const B = import.meta.env.BASE_URL;
+
+const books = (await getCollection('items', ({ data }) => !data.draft && data.kind === 'book')).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+const notes = (await getCollection('essays', ({ data }) => !data.draft && data.topic === 'reading')).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+
+// 书架按状态分区。没填 status 的当作读完 —— 补录旧书时最省事的默认。
+const SECTIONS = [
+  { key: 'doing', label: '在读' },
+  { key: 'done', label: '读完' },
+  { key: 'want', label: '想读' },
+] as const;
+const shelf = SECTIONS.map((s) => ({
+  ...s,
+  list: books.filter((b) => (b.data.status ?? 'done') === s.key),
+})).filter((s) => s.list.length > 0);
+
+const thisYear = new Date().getFullYear();
+const doneThisYear = books.filter(
+  (b) => (b.data.status ?? 'done') === 'done' && b.data.date.getFullYear() === thisYear
+).length;
+
+const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
 ---
-<InterestLayout icon="book" title="读书" description="书架选书困难症？让随机挑选器帮你决定今晚读什么。">
-  <div class="demo-card">
-    <div id="book" class="demo-result" aria-live="polite">
-      <div class="result-icon"><Icon name="book" size={34} /></div>
-      <div style="margin-top:8px;color:var(--muted)">点下面的按钮，从我的书架抽一本</div>
+<InterestLayout icon="book" title="读书" description="读到的书都记在书架上，值得说几句的会单写一篇。">
+  <div class="split">
+    <div class="split-main">
+      {books.length === 0 ? (
+        <p class="empty">书架还是空的。在 <code>src/content/items/</code> 加一个 <code>kind: book</code> 的文件即可。</p>
+      ) : (
+        shelf.map((s) => (
+          <section class="shelf">
+            <div class="sec-hd">
+              <h2>{s.label}</h2>
+              <span class="sec-note">{s.list.length} 本</span>
+            </div>
+            {s.list.map((b) => <ItemCard item={b} essayHref={hrefOf(b.data.essay?.id)} />)}
+          </section>
+        ))
+      )}
     </div>
-    <div class="demo-row" style="justify-content:center">
-      <button id="pick" class="demo-btn" type="button"><Icon name="dice" size={16} />帮我挑一本</button>
-    </div>
-    <p class="demo-hint center">
-      书架共 <span id="count">0</span> 本，都是我想读或读过的。
-    </p>
+
+    <aside>
+      <section class="side-box">
+        <h2>今年</h2>
+        <div class="side-row"><span>读完</span><span class="side-val">{doneThisYear} 本</span></div>
+        <div class="side-row"><span>书架</span><span class="side-val">{books.length} 本</span></div>
+      </section>
+
+      <section class="side-box">
+        <h2>读后感</h2>
+        {notes.length === 0 ? (
+          <p class="side-foot">还没写过。写一篇 <code>topic: reading</code> 的长文就会出现在这里。</p>
+        ) : (
+          <>
+            {notes.map((e) => (
+              <div class="side-row">
+                <a href={`${B}blog/${e.id}/`}>{e.data.title}</a>
+              </div>
+            ))}
+            <p class="side-foot">共 {notes.length} 篇</p>
+          </>
+        )}
+      </section>
+    </aside>
   </div>
 
-  <style>
-    .demo-result .book-title { font-size: 20px; font-weight: 700; margin-top: 8px; }
-    .demo-result .book-author { color: var(--muted); font-size: 14px; margin-top: 4px; }
-  </style>
-
-  <script>
-    import { onPageReady, markReady } from '../../../scripts/init';
-
-    const BOOKS = [
-      { title: '人类简史', author: '尤瓦尔·赫拉利', category: '社科' },
-      { title: '枪炮、病菌与钢铁', author: '贾雷德·戴蒙德', category: '历史' },
-      { title: '三体', author: '刘慈欣', category: '科幻' },
-      { title: '基地', author: '艾萨克·阿西莫夫', category: '科幻' },
-      { title: '置身事内', author: '兰小欢', category: '社科' },
-      { title: '万历十五年', author: '黄仁宇', category: '历史' },
-      { title: '你一生的故事', author: '特德·姜', category: '科幻' },
-      { title: '乡土中国', author: '费孝通', category: '社科' },
-      { title: '银河系搭车客指南', author: '道格拉斯·亚当斯', category: '科幻' },
-      { title: '叫魂', author: '孔飞力', category: '历史' },
-    ];
-
-    function initReadingDemo() {
-      const card = document.querySelector<HTMLElement>('.demo-card');
-      if (!markReady(card)) return;
-
-      const book = document.getElementById('book');
-      const pickBtn = document.getElementById('pick');
-      const count = document.getElementById('count');
-      if (!book || !pickBtn || !count) return;
-
-      count.textContent = String(BOOKS.length);
-      // 先把初始图标存一份，后面每次重建内容都从它克隆
-      const iconTemplate = book.querySelector('.result-icon');
-      let last = -1;
-
-      pickBtn.addEventListener('click', () => {
-        let i = Math.floor(Math.random() * BOOKS.length);
-        if (i === last) i = (i + 1) % BOOKS.length;
-        last = i;
-        const b = BOOKS[i];
-
-        // 重建内容，让 .demo-result 的入场动画重新播一遍
-        const icon = iconTemplate?.cloneNode(true);
-        book.replaceChildren();
-        if (icon) book.append(icon);
-        const title = document.createElement('div');
-        title.className = 'book-title';
-        title.textContent = `《${b.title}》`;
-        const author = document.createElement('div');
-        author.className = 'book-author';
-        author.textContent = `${b.author} · ${b.category}`;
-        book.append(title, author);
-      });
-    }
-
-    onPageReady(initReadingDemo);
-  </script>
+  <DemoToggle icon="dice" label="顺手玩玩：随机选书">
+    <BookPicker />
+  </DemoToggle>
 </InterestLayout>
+
+<style>
+  .shelf + .shelf { margin-top: 28px; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .empty code, .side-foot code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+  }
+</style>

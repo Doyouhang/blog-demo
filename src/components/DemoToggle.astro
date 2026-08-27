@@ -1,0 +1,41 @@
+---
+// 折叠彩蛋：把原来占满整页的交互 demo 收到内容底部。
+// 用原生 <details>，零 JS —— 这类可有可无的东西不值得再加脚本。
+import Icon from './Icon.astro';
+import type { IconName } from './icons';
+
+interface Props {
+  icon: IconName;
+  label: string;
+}
+const { icon, label } = Astro.props;
+---
+<details class="lab">
+  <summary>
+    <Icon name={icon} size={15} />
+    {label}
+  </summary>
+  <div class="lab-body">
+    <slot />
+  </div>
+</details>
+
+<style>
+  .lab {
+    margin-top: 40px; padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .lab summary {
+    cursor: pointer; color: var(--muted); font-size: 14px;
+    display: flex; align-items: center; gap: 8px;
+    list-style: none; width: fit-content;
+  }
+  .lab summary::-webkit-details-marker { display: none; }
+  .lab summary::after {
+    content: '▾'; font-size: 11px;
+    transition: transform var(--dur-fast) var(--ease);
+  }
+  .lab[open] summary::after { transform: rotate(180deg); }
+  .lab summary:hover { color: var(--fg); }
+  .lab-body { margin-top: 16px; }
+</style>

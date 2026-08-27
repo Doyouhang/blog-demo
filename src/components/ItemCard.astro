@@ -1,0 +1,88 @@
+---
+// 收藏条目卡：歌和书共用。
+// 没封面的条目留出等宽空位而不是顶到最左 —— 列表里有封面没封面混排时，
+// 标题不在同一条竖线上会很难扫。留白但不画假的占位封面。
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  item: CollectionEntry<'items'>;
+  /** 关联长文的链接，由调用方解析好传进来（关联只存在 item 一侧） */
+  essayHref?: string;
+}
+const { item, essayHref } = Astro.props;
+const { kind, title, creator, cover, date, rating, blurb, status } = item.data;
+
+const STATUS_LABEL = { want: '想读', doing: '在读', done: '读完' } as const;
+const when = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+---
+<article class:list={['item', !cover && 'item-bare']}>
+  {cover && (
+    <div class="item-cover">
+      <Image src={cover} alt={`《${title}》封面`} width={160} height={213} />
+    </div>
+  )}
+  <div class="item-body">
+    <h3>
+      {kind === 'book' ? `《${title}》` : title}
+      {status && <span class="badge">{STATUS_LABEL[status]}</span>}
+    </h3>
+    <p class="meta">
+      <span>{creator}</span>
+      <span class="dot">·</span>
+      <span>{when}</span>
+      {rating != null && (
+        <>
+          <span class="dot">·</span>
+          <span class="rate" title={`${rating} 分（满分 5）`} aria-label={`评分 ${rating} 分，满分 5 分`}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <i class:list={['pip', i < rating && 'on']} aria-hidden="true"></i>
+            ))}
+          </span>
+        </>
+      )}
+    </p>
+    <p class="blurb">{blurb}</p>
+    {essayHref && <a class="more" href={essayHref}>写了点感想 →</a>}
+  </div>
+</article>
+
+<style>
+  .item {
+    display: flex; gap: 16px;
+    padding: 16px 0; border-bottom: 1px solid var(--border);
+  }
+  .item-cover { flex: 0 0 80px; }
+  .item-cover :global(img) {
+    width: 80px; height: auto; border-radius: 8px; display: block;
+    border: 1px solid var(--border);
+  }
+  /* 无封面：留出与封面等宽的空位，保证标题左边缘对齐 */
+  .item-bare { padding-left: 96px; }
+  .item-body { min-width: 0; flex: 1; }
+  .item h3 {
+    margin: 0 0 6px; font-size: 16px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 11px; font-weight: 500; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px;
+  }
+  .meta {
+    margin: 0 0 8px; color: var(--muted); font-size: 13px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .dot { opacity: .5; }
+  .rate { display: inline-flex; gap: 3px; align-items: center; }
+  .pip {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border);
+  }
+  .pip.on { background: var(--accent); }
+  .blurb { margin: 0; font-size: 14px; line-height: 1.7; }
+  .more {
+    display: inline-block; margin-top: 8px; font-size: 13px;
+    color: var(--accent); text-decoration: none;
+  }
+  .more:hover { text-decoration: underline; }
+</style>

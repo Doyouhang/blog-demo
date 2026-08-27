@@ -1,0 +1,120 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import MomentCard from '../../components/MomentCard.astro';
+import Icon from '../../components/Icon.astro';
+import PhotoLab from '../../components/PhotoLab.astro';
+import { getCollection, render } from 'astro:content';
+
+const all = (await getCollection('moments', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+// render() 要在页面这层 await，组件里做不了；拿到 Content 组件往下传
+const rendered = await Promise.all(
+  all.map(async (m) => ({ moment: m, Content: (await render(m)).Content }))
+);
+
+// 按年月分组，时间线才有节奏，不然一长条读不出跨度
+const groups = new Map<string, typeof rendered>();
+for (const r of rendered) {
+  const key = r.moment.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key)!.push(r);
+}
+
+const photoCount = all.reduce((n, m) => n + m.data.photos.length, 0);
+const places = [...new Set(all.map((m) => m.data.place).filter((p): p is string => !!p))];
+---
+<BaseLayout title="此间" description="日常的图文记录：city walk、旅行、随手拍。" fullWidth>
+  <div class="container-wide">
+    <PageHeader
+      eyebrow="时间线"
+      title="此间"
+      lead="不是作品集，就是随手记。走到哪拍到哪，配一段话。"
+    />
+
+    {all.length === 0 ? (
+      <div class="empty">
+        <Icon name="camera" size={22} />
+        <p>还没有记录。</p>
+        <p class="hint">
+          在 <code>src/content/moments/</code> 下新建一个目录，放 <code>index.md</code> 和照片就行。
+        </p>
+      </div>
+    ) : (
+      <div class="split">
+        <div class="split-main">
+          {[...groups].map(([month, list]) => (
+            <section class="month">
+              <h2 class="month-hd">{month}</h2>
+              {list.map(({ moment, Content }) => (
+                <MomentCard moment={moment}><Content /></MomentCard>
+              ))}
+            </section>
+          ))}
+        </div>
+
+        <aside>
+          <section class="side-box">
+            <h2>攒了多少</h2>
+            <div class="side-row"><span>记录</span><span class="side-val">{all.length} 条</span></div>
+            <div class="side-row"><span>照片</span><span class="side-val">{photoCount} 张</span></div>
+            <div class="side-row"><span>去过</span><span class="side-val">{places.length} 个地方</span></div>
+          </section>
+
+          {places.length > 0 && (
+            <section class="side-box">
+              <h2>去过的地方</h2>
+              {places.slice(0, 12).map((p) => (
+                <div class="side-row"><span>{p}</span></div>
+              ))}
+              {places.length > 12 && <p class="side-foot">还有 {places.length - 12} 个</p>}
+            </section>
+          )}
+        </aside>
+      </div>
+    )}
+
+    <details class="lab">
+      <summary>
+        <Icon name="camera" size={15} />
+        顺手玩玩：调色台
+      </summary>
+      <PhotoLab />
+    </details>
+  </div>
+</BaseLayout>
+
+<style>
+  .month + .month { margin-top: 8px; }
+  .month-hd {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    margin: 28px 0 0; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .month:first-child .month-hd { margin-top: 0; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty p { margin: 10px 0 0; }
+  .empty .hint { font-size: 13px; }
+  .lab {
+    margin-top: 40px; padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .lab summary {
+    cursor: pointer; color: var(--muted); font-size: 14px;
+    display: flex; align-items: center; gap: 8px;
+    list-style: none; width: fit-content;
+  }
+  .lab summary::-webkit-details-marker { display: none; }
+  .lab summary::after {
+    content: '▾'; font-size: 11px; transition: transform var(--dur-fast) var(--ease);
+  }
+  .lab[open] summary::after { transform: rotate(180deg); }
+  .lab summary:hover { color: var(--fg); }
+  .lab > :global(.demo-card) { margin-top: 16px; }
+  .empty code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+  }
+</style>

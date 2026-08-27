@@ -1,0 +1,187 @@
+import { chromium } from 'playwright-core';
+
+const BASE = process.env.BASE_URL || 'http://localhost:4321';
+
+// 转场动画期间浏览器用快照层盖住页面，点击落不到真实元素上（约 250ms）。
+// 真实用户在这之后才可能点到，所以测试也等它结束。
+async function waitInteractive(page, selector) {
+  await page.waitForFunction((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === el;
+  }, selector, { timeout: 3000 });
+}
+const results = [];
+const ok = (name, pass, extra = '') =>
+  results.push(`${pass ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
+
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome' });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e)));
+page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+
+await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+ok('首页加载', await page.title() === '迩迩的小站', await page.title());
+
+// 1. 首页兴趣卡片是深链，不是列表页
+const cards = await page.$$eval('.int-row a.int-cell', (els) => els.map((e) => e.getAttribute('href')));
+ok('首页兴趣全展示（5 个，无「查看全部」）', cards.length === 5, cards.length + ' 个');
+ok('首页兴趣卡片深链', cards.every((h) => /\/interests\/\w+\/$/.test(h ?? '')), cards[0] ?? '');
+const sideBoxes = await page.$$eval('.side-box h2', (els) => els.map((e) => e.textContent?.trim()));
+ok('首页侧栏「此刻」+ 行情', sideBoxes.length === 2, sideBoxes.join(' / '));
+
+// 2. 客户端导航（ClientRouter 生效 = 不发生整页刷新）
+await page.evaluate(() => { window.__stillHere = true; });
+await page.click('.nav-links a[href="/interests/"]');
+await page.waitForSelector('h1:has-text("兴趣分享")');
+const noReload = await page.evaluate(() => window.__stillHere === true);
+ok('跨页转场走客户端导航（无整页刷新）', noReload);
+
+// 3. 客户端导航进 demo 页后，脚本仍然初始化（astro:page-load）
+await page.click('a[href="/interests/music/"]');
+// 换页后脚本要重新加载执行，这里断言它在 100ms 内就绪（实测约 30ms，人眼无感）。
+// 钢琴现在收在折叠彩蛋里，但 data-ready 不该依赖折叠状态 —— 脚本进页面就跑，
+// 不等 details 打开。所以用 attached 而不是默认的 visible，否则测的是「我点得多快」。
+let readyMs = -1;
+try {
+  const t0 = Date.now();
+  await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 100, state: 'attached' });
+  readyMs = Date.now() - t0;
+} catch { /* 超时则保持 -1 */ }
+ok('换页后 demo 在 100ms 内完成初始化（不依赖彩蛋是否展开）', readyMs >= 0, readyMs >= 0 ? readyMs + 'ms' : '超过 100ms');
+// 交互测试要真能点到，这时才展开
+await page.click('details.lab summary');
+await waitInteractive(page, '.piano-keys .key.white');
+// 只按下不松开：松开会正常清掉 .active，那样测不出绑定有没有生效
+const key = await page.locator('.piano-keys .key.white').first();
+const box = await key.boundingBox();
+await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+await page.mouse.down();
+const pianoBound = await page.evaluate(() =>
+  document.querySelector('.piano-keys .key.white')?.classList.contains('active') ?? false);
+// 按住时不能冒出纵向滚动条：.piano 只写 overflow-x 时 overflow-y 会被算成 auto，
+// 按键的 translateY(2px) 就会撑出 2px，右侧闪出一条滚动条，整块跟着抖
+const pianoNoScroll = await page.evaluate(() => {
+  const el = document.querySelector('.piano');
+  return el.scrollHeight <= el.clientHeight;
+});
+await page.mouse.up();
+const released = await page.evaluate(() =>
+  !(document.querySelector('.piano-keys .key.white')?.classList.contains('active') ?? true));
+ok('初始化完成后按琴键有反应', pianoBound);
+ok('松开后高亮正常消失', released);
+ok('按住琴键不冒出纵向滚动条', pianoNoScroll);
+
+// 4. 键盘可用性：Tab 聚焦 + 空格发声
+await page.focus('.piano-keys .key.white');
+await page.keyboard.down(' ');
+const kbd = await page.evaluate(() =>
+  document.querySelector('.piano-keys .key.white')?.classList.contains('active') ?? false);
+await page.keyboard.up(' ');
+ok('钢琴键盘可操作（空格）', kbd);
+
+// 5. 代码 demo：Worker 沙箱正常输出（含异步）
+await page.click('a[href="/interests/"]');
+await page.waitForSelector('a[href="/interests/coding/"]');
+await page.click('a[href="/interests/coding/"]');
+await page.waitForSelector('#run');
+await page.click('#run');
+await page.waitForFunction(() => (document.getElementById('output')?.textContent ?? '').includes('1 + 2 = 3'), null, { timeout: 5000 });
+ok('代码 demo 同步输出', true);
+await page.waitForFunction(() => (document.getElementById('output')?.textContent ?? '').includes('一秒后我也来了'), null, { timeout: 5000 });
+ok('代码 demo 异步输出不再丢失', true);
+
+// 6. 死循环被超时掐掉，页面没被卡死
+await page.fill('#code', 'while (true) {}');
+await page.click('#run');
+await page.waitForFunction(() => (document.getElementById('output')?.textContent ?? '').includes('执行超时'), null, { timeout: 8000 });
+const aliveAfterLoop = await page.evaluate(() => 1 + 1 === 2);
+ok('死循环被超时中止且页面存活', aliveAfterLoop);
+
+// 7. 主题切换 + 跨页保持
+await page.click('#theme-toggle');
+const themeAfterToggle = await page.getAttribute('html', 'data-theme');
+await page.click('.nav-links a[href="/blog/"]');
+await page.waitForSelector('h1:has-text("博客")');
+const themeAfterNav = await page.getAttribute('html', 'data-theme');
+ok('主题切换生效', themeAfterToggle === 'dark' || themeAfterToggle === 'light', String(themeAfterToggle));
+ok('主题跨页保持', themeAfterNav === themeAfterToggle, `${themeAfterToggle} -> ${themeAfterNav}`);
+
+// 8. 截图：亮色 / 暗色 / 窄屏
+await page.evaluate(() => { localStorage.setItem('theme', 'light'); document.documentElement.dataset.theme = 'light'; });
+// ——— 内容型页面（阶段一新增）———
+await page.goto(BASE + '/moments/', { waitUntil: 'networkidle' });
+ok('时间线页可访问', (await page.title()).includes('此间'), await page.title());
+ok('主导航有此间入口', await page.locator('.nav-links a[href="/moments/"]').count() === 1);
+// 示例内容是 draft，线上应为空状态而不是报错
+const momentsOk = await page.evaluate(() =>
+  !!document.querySelector('.page-head h1') && !document.body.textContent.includes('undefined'));
+ok('时间线空状态正常渲染', momentsOk);
+
+await page.goto(BASE + '/interests/music/', { waitUntil: 'networkidle' });
+ok('音乐页是歌单而不是钢琴', await page.locator('.split-main .sec-hd h2').first().textContent() === '歌单');
+ok('钢琴降为折叠彩蛋', await page.locator('details.lab summary').count() === 1);
+const pianoHidden = await page.evaluate(() => {
+  const d = document.querySelector('details.lab');
+  return d && !d.open;
+});
+ok('彩蛋默认收起', pianoHidden);
+
+await page.goto(BASE + '/interests/reading/', { waitUntil: 'networkidle' });
+ok('读书页有书架结构', await page.locator('details.lab').count() === 1);
+
+// 合并掉的两个页面不该再构建出来。
+// 用独立 page 去撞 404 —— 主 page 上挂着「运行期间无 JS 报错」的 console 收集器，
+// 在它身上故意触发 404 会把预期内的错误算成失败。
+{
+  const probe = await browser.newPage();
+  for (const gone of ['/interests/photography/', '/interests/travel/']) {
+    const r = await probe.goto(BASE + gone, { waitUntil: 'domcontentloaded' });
+    ok(`${gone} 已移除`, r.status() === 404, String(r.status()));
+  }
+  await probe.close();
+}
+
+await page.goto(BASE + '/interests/stocks/', { waitUntil: 'networkidle' });
+await page.screenshot({ path: '/tmp/shot-light.png', fullPage: true });
+await page.evaluate(() => { localStorage.setItem('theme', 'dark'); document.documentElement.dataset.theme = 'dark'; });
+await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+await page.screenshot({ path: '/tmp/shot-dark.png', fullPage: true });
+const mobile = await browser.newPage({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
+await mobile.goto(BASE + '/interests/', { waitUntil: 'networkidle' });
+await mobile.screenshot({ path: '/tmp/shot-mobile.png', fullPage: true });
+const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+ok('375px 窄屏无横向溢出', !overflow);
+
+// 二次进入同一 demo（模块已执行过）仍要立刻可用
+await page.goto(BASE + '/interests/', { waitUntil: 'networkidle' });
+await page.click('a[href="/interests/music/"]');
+await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 200, state: 'attached' });
+await page.click('details.lab summary');
+await waitInteractive(page, '.piano-keys .key.white');
+const b2 = await page.locator('.piano-keys .key.white').first().boundingBox();
+await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2);
+await page.mouse.down();
+const again = await page.evaluate(() =>
+  document.querySelector('.piano-keys .key.white')?.classList.contains('active') ?? false);
+await page.mouse.up();
+ok('二次进入 demo 同样可用', again);
+
+// 反复进出不会重复绑定（一次按下只应播一个音）
+const bindCount = await page.evaluate(() => {
+  let n = 0;
+  const k = document.querySelector('.piano-keys .key.white');
+  const orig = k.classList.add.bind(k.classList);
+  k.classList.add = (...a) => { if (a[0] === 'active') n++; return orig(...a); };
+  k.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  return n;
+});
+ok('没有重复绑定事件', bindCount === 1, `pointerdown 触发 ${bindCount} 次`);
+
+ok('运行期间无 JS 报错', errors.length === 0, errors.slice(0, 3).join(' | '));
+
+await browser.close();
+console.log('\n' + results.join('\n'));
+console.log('\n失败项：' + results.filter((r) => r.startsWith('❌')).length);

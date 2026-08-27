@@ -1,0 +1,84 @@
+---
+// 时间线上的一条图文动态。
+// 图片数量决定版式：1 张铺满，2 张平分，3 张及以上走网格 —— 和朋友圈一个道理，
+// 固定网格在只有一张图时会把竖构图压得很难看。
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  moment: CollectionEntry<'moments'>;
+}
+// 正文通过 slot 传进来：render() 返回的是组件而不是 HTML 字符串，
+// 用 slot 比在页面里先渲染成字符串再 set:html 干净，也不用关掉转义。
+const { moment } = Astro.props;
+const { date, place, photos } = moment.data;
+
+const day = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+const layout = photos.length === 1 ? 'one' : photos.length === 2 ? 'two' : 'grid';
+
+// EXIF 是可选的：手机拍的、别人给的图都不会有。有就显示，没有不留痕迹。
+const shot = photos.find((p) => p.exif)?.exif;
+---
+<article class="moment">
+  <div class="moment-hd">
+    <time datetime={date.toISOString()}>{day} <span class="hm">{time}</span></time>
+    {place && <span class="place">{place}</span>}
+  </div>
+
+  <div class="moment-text"><slot /></div>
+
+  {photos.length > 0 && (
+    <div class:list={['shots', layout]}>
+      {photos.map((p) => (
+        <figure>
+          <Image src={p.src} alt={p.alt} widths={[400, 800, 1200]} sizes="(max-width: 720px) 100vw, 640px" />
+        </figure>
+      ))}
+    </div>
+  )}
+
+  {shot && (
+    <p class="exif">
+      {[shot.camera, shot.lens, shot.focal, shot.aperture, shot.shutter, shot.iso && `ISO ${shot.iso}`]
+        .filter(Boolean)
+        .join(' · ')}
+    </p>
+  )}
+</article>
+
+<style>
+  .moment { padding: 24px 0; border-bottom: 1px solid var(--border); }
+  .moment-hd {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    color: var(--muted); font-size: 13px; margin-bottom: 10px;
+  }
+  .moment-hd time { font-weight: 600; color: var(--fg); font-size: 14px; }
+  .hm { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .place { display: inline-flex; align-items: center; gap: 4px; }
+  .place::before { content: '·'; opacity: .5; }
+
+  .moment-text { font-size: 15px; line-height: 1.85; }
+  .moment-text :global(p) { margin: 0; }
+
+  .shots { display: grid; gap: 6px; margin-top: 14px; }
+  .shots.one { grid-template-columns: 1fr; max-width: 640px; }
+  .shots.two { grid-template-columns: 1fr 1fr; }
+  .shots.grid { grid-template-columns: repeat(3, 1fr); }
+  .shots figure { margin: 0; overflow: hidden; border-radius: 10px; }
+  .shots :global(img) {
+    width: 100%; height: 100%; display: block; object-fit: cover;
+  }
+  /* 一张图保留原始比例，多张裁成方形才能对齐 */
+  .shots.two figure, .shots.grid figure { aspect-ratio: 1; }
+  .shots.one :global(img) { height: auto; }
+
+  .exif {
+    margin: 10px 0 0; color: var(--muted); font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 520px) {
+    .shots.grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>

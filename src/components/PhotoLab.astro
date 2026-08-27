@@ -1,6 +1,8 @@
 ---
-import InterestLayout from '../../../layouts/InterestLayout.astro';
-
+// 调色台：原本是摄影页的整页 demo。摄影与旅行合并进 /moments/ 后，
+// 它降为时间线底部的折叠彩蛋 —— 和照片主题相关，但不该挡在内容前面。
+// 容器类用 .photo-lab 而不是 .demo-card：同页若再有别的 demo，
+// markReady 按 .demo-card 找会撞上。
 const sliders = [
   { id: 'brightness', label: '亮度', min: 50, max: 150, value: 100, unit: '%' },
   { id: 'contrast', label: '对比度', min: 50, max: 150, value: 100, unit: '%' },
@@ -14,8 +16,7 @@ const presets = [
   { key: 'vivid', label: '鲜艳' },
 ];
 ---
-<InterestLayout icon="camera" title="摄影" description="给这张「照片」调调色，体验一把后期。拖动滑杆或选个预设。">
-  <div class="demo-card">
+  <div class="demo-card photo-lab">
     <div class="photo-frame">
       <svg id="photo" viewBox="0 0 400 260" role="img" aria-label="示例风景照：远山、太阳和草地">
         <defs>
@@ -77,7 +78,7 @@ const presets = [
   </style>
 
   <script>
-    import { onPageReady, markReady } from '../../../scripts/init';
+    import { onPageReady, markReady } from '../scripts/init';
 
     type Adjust = { brightness: number; contrast: number; saturate: number; hue: number };
 
@@ -89,7 +90,7 @@ const presets = [
     };
 
     function initPhotoDemo() {
-      const card = document.querySelector<HTMLElement>('.demo-card');
+      const card = document.querySelector<HTMLElement>('.photo-lab');
       if (!markReady(card)) return;
 
       const photo = document.getElementById('photo');
@@ -143,4 +144,3 @@ const presets = [
 
     onPageReady(initPhotoDemo);
   </script>
-</InterestLayout>

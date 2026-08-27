@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
-import PostCard from '../components/PostCard.astro';
+import EssayCard from '../components/EssayCard.astro';
 import type { IconName } from '../components/icons';
 import { getCollection } from 'astro:content';
 import { interests } from '../data/interests';
@@ -11,7 +11,7 @@ import stockData from '../data/stocks.json';
 
 const B = import.meta.env.BASE_URL;
 
-const posts = (await getCollection('posts'))
+const posts = (await getCollection('essays'))
   .filter((p) => !p.data.draft)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
   .slice(0, 3);
@@ -49,7 +49,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
           <h2>最近文章</h2>
           <a href={`${B}blog/`}>全部文章 →</a>
         </div>
-        {posts.map((p) => <PostCard post={p} />)}
+        {posts.map((p) => <EssayCard post={p} />)}
       </div>
 
       <aside>
@@ -95,7 +95,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
     <div class="container-wide band-inner">
       <div class="sec-hd">
         <h2>我的兴趣</h2>
-        <span class="sec-note">每个都配了能上手玩的小 demo</span>
+        <span class="sec-note">攒下来的书、歌和琢磨过的东西</span>
       </div>
       <div class="int-row">
         {interests.map((i) => (

@@ -1,0 +1,149 @@
+---
+// 迷你钢琴：原本占满整个音乐页，现在降为歌单底部的折叠彩蛋。
+// 容器类从 .demo-card 换成 .mini-piano —— 同页有多个 demo 时，
+// 按 .demo-card 找会抓到第一个，markReady 就把别人的标记占了。
+import Icon from './Icon.astro';
+
+const whiteKeys = [
+  { note: 'C4', freq: 261.63, label: 'C' },
+  { note: 'D4', freq: 293.66, label: 'D' },
+  { note: 'E4', freq: 329.63, label: 'E' },
+  { note: 'F4', freq: 349.23, label: 'F' },
+  { note: 'G4', freq: 392.0, label: 'G' },
+  { note: 'A4', freq: 440.0, label: 'A' },
+  { note: 'B4', freq: 493.88, label: 'B' },
+  { note: 'C5', freq: 523.25, label: 'C' },
+];
+const blackKeys = [
+  { note: 'C#4', freq: 277.18, left: '9%' },
+  { note: 'D#4', freq: 311.13, left: '21.5%' },
+  { note: 'F#4', freq: 369.99, left: '46.5%' },
+  { note: 'G#4', freq: 415.3, left: '59%' },
+  { note: 'A#4', freq: 466.16, left: '71.5%' },
+];
+---
+  <div class="demo-card mini-piano">
+    <div class="piano">
+      <div class="piano-keys" role="group" aria-label="迷你钢琴键盘">
+        {whiteKeys.map((k) => (
+          <button class="key white" type="button" data-freq={k.freq} aria-label={`弹奏 ${k.note}`}>
+            <span aria-hidden="true">{k.label}</span>
+          </button>
+        ))}
+        {blackKeys.map((k) => (
+          <button
+            class="key black"
+            type="button"
+            data-freq={k.freq}
+            style={`left:${k.left}`}
+            aria-label={`弹奏 ${k.note}`}
+          ></button>
+        ))}
+      </div>
+    </div>
+    <p class="demo-hint">
+      <Icon name="bulb" size={15} /> 写代码卡住的时候，随便按几个键，假装自己是后摇乐队的键盘手。
+      用键盘的话：<kbd>Tab</kbd> 移到琴键，<kbd>空格</kbd> 或 <kbd>回车</kbd> 发声。
+    </p>
+  </div>
+
+  <style>
+    .piano {
+      /* 窄屏靠它横向滚动。但只写 overflow-x 时，overflow-y 的计算值会变成 auto
+         而不是 visible（规范如此：二者之一非 visible，visible 就被算成 auto），
+         于是按键的 translateY(2px) 会把内容撑出 2px，右侧冒出一条纵向滚动条，
+         一按琴键整块就抖。显式关掉纵向滚动，再留点 padding 给按下位移和焦点环。 */
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 4px 0;
+    }
+    .piano-keys {
+      position: relative; display: flex; height: 190px;
+      min-width: 460px; user-select: none;
+    }
+    .key {
+      border: none; cursor: pointer; font-family: inherit; padding: 0;
+      transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+    }
+    .key.white {
+      flex: 1; background: #fff; border: 1px solid #d8dde4;
+      border-radius: 0 0 8px 8px; color: #65707a; font-size: 13px;
+      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;
+    }
+    .key.white.active { background: var(--accent); color: var(--accent-fg); }
+    .key.black {
+      position: absolute; top: 0; width: 7%; height: 60%;
+      background: #1f2328; border-radius: 0 0 6px 6px; z-index: 2;
+    }
+    .key.black.active { background: var(--accent); }
+    .key.active { transform: translateY(2px); }
+    kbd {
+      background: var(--code-bg); border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 6px; padding: 1px 6px; font-size: 12px; font-family: inherit; color: var(--fg);
+    }
+  </style>
+
+  <script>
+    import { onPageReady, markReady } from '../scripts/init';
+
+    let ctx: AudioContext | null = null;
+
+    function play(freq: number) {
+      if (!freq) return;
+      if (!ctx) {
+        const AC =
+          window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AC) return;
+        ctx = new AC();
+      }
+      if (ctx.state === 'suspended') void ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const t = ctx.currentTime;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+      osc.start(t);
+      osc.stop(t + 0.95);
+    }
+
+    function initPiano() {
+      const card = document.querySelector<HTMLElement>('.mini-piano');
+      if (!markReady(card)) return;
+
+      const keys = document.querySelectorAll<HTMLElement>('.piano-keys .key');
+      if (!keys.length) return;
+
+      keys.forEach((key) => {
+        const freq = parseFloat(key.dataset.freq ?? '0');
+        const press = () => {
+          play(freq);
+          key.classList.add('active');
+        };
+        const release = () => key.classList.remove('active');
+
+        key.addEventListener('pointerdown', press);
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach((evt) =>
+          key.addEventListener(evt, release)
+        );
+
+        // 键盘操作：preventDefault 既拦住空格滚页，也避免浏览器再补一次 click
+        key.addEventListener('keydown', (e) => {
+          const ev = e as KeyboardEvent;
+          if (ev.key !== ' ' && ev.key !== 'Enter') return;
+          if (ev.repeat) return;
+          ev.preventDefault();
+          press();
+        });
+        key.addEventListener('keyup', release);
+        key.addEventListener('blur', release);
+      });
+    }
+
+    onPageReady(initPiano);
+  </script>
