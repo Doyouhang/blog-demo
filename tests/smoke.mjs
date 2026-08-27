@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 
-const BASE = process.env.BASE_URL || 'http://localhost:4321';
+const BASE = process.env.SMOKE_BASE || process.env.BASE_URL || 'http://localhost:4321';
 
 // 转场动画期间浏览器用快照层盖住页面，点击落不到真实元素上（约 250ms）。
 // 真实用户在这之后才可能点到，所以测试也等它结束。

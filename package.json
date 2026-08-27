@@ -8,10 +8,11 @@
     "fetch:market": "node scripts/fetch-market.mjs",
     "fetch:all": "npm run fetch:market && npm run fetch:stocks",
     "check": "astro check",
-    "build": "astro build && pagefind --site dist",
+    "build": "astro build && node scripts/index-search.mjs",
     "preview": "astro preview",
     "studio": "node studio/server.mjs",
-    "changelog": "node scripts/changelog.mjs"
+    "changelog": "node scripts/changelog.mjs",
+    "test:smoke": "node tests/run.mjs"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.19",
