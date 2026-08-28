@@ -2,18 +2,26 @@
 //
 // 和 fetch-stocks.mjs 同一套约定：**这个脚本不会让构建失败**，抓不到就沿用上一份。
 //
-// 关于「市场宽度」的口径，踩过坑记在这里：
+// 关于「市场宽度」的口径，踩过的坑记在这里：
 // 东财 clist 接口的 pz 有硬上限 100，想按个股统计全市场涨跌家数就得翻 54 页，
 // 请求太密必被限流。行业板块自带 f104/f105（板块内涨跌家数），但 496 个板块里
 // 一级和细分并存，同一只股票被重复归类 —— 加总出来 16878 只，是实际的三倍多，不能用。
-// 所以这里用**板块级宽度**：496 个细分行业里有多少个收红。它口径自洽、一次分页拿全，
-// 且比个股家数更能反映「热点是普涨还是只集中在几个方向」。
+// 所以这里用**板块级宽度**：496 个细分行业里有多少个收红，口径自洽，
+// 也比个股家数更能看出「热点是普涨还是只集中在几个方向」。
+//
+// 板块行情**不走 clist**。clist 翻五页的请求密度会稳定触发限流（实测触发后
+// 连打三分钟都不恢复，脚本内重试跨不过这个窗口），线上因此长期抓不到板块。
+// 改成：板块清单固化在 src/data/sectors.list.json（半年也未必变一次，
+// 用 npm run refresh:sectors 手动刷），构建期用 ulist.np 按清单一次批量取 ——
+// 496 个 secid 一条 URL 拿全，走的是自选股和指数一直在用、没出过问题的那个接口。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { toArray, rowsToSectors, moodOf, summarize, reason } from './market-lib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outPath = path.join(here, '../src/data/market.json');
+const listPath = path.join(here, '../src/data/sectors.list.json');
 
 const TIMEOUT_MS = 20000;
 const ATTEMPTS = 3;
@@ -40,12 +48,6 @@ async function getJson(url) {
   return res.json();
 }
 
-// clist 的 diff 有时是数组、有时是以下标为键的对象，统一成数组
-const toArray = (body) => {
-  const d = body?.data?.diff;
-  return Array.isArray(d) ? d : Object.values(d ?? {});
-};
-
 async function fetchIndices() {
   const secids = INDICES.map((i) => i.secid).join(',');
   const body = await getJson(
@@ -70,41 +72,34 @@ async function fetchIndices() {
   return rows;
 }
 
-async function fetchSectors() {
-  const all = [];
-  // 按涨跌幅降序，翻到取不出新数据为止（板块总数会变，别写死页数）
-  for (let pn = 1; pn <= 8; pn++) {
-    const body = await getJson(
-      'https://push2.eastmoney.com/api/qt/clist/get' +
-        `?pn=${pn}&pz=100&po=1&fid=f3&fs=m:90+t:2&fields=f3,f12,f14&fltt=2`
-    );
-    const page = toArray(body);
-    all.push(...page);
-    if (page.length < 100) break;
-    await sleep(PAGE_GAP_MS);
+// 清单读不出来是配置问题，不是网络抖动 —— 重试三次只会把同一条错刷三遍、白等六秒。
+// 所以在进重试之前先读，读不到就直接把板块这一半标记为不可用。
+function readSectorList() {
+  try {
+    const list = JSON.parse(readFileSync(listPath, 'utf8'));
+    if (!Array.isArray(list) || list.length === 0) throw new Error('清单是空的');
+    return list;
+  } catch (e) {
+    console.warn(`[market] 板块清单不可用：${e.message}`);
+    console.warn('[market] 跑 npm run refresh:sectors 生成它。这次先只出指数。');
+    return null;
   }
-  if (all.length < 50) throw new Error(`板块只拿到 ${all.length} 个，数据不完整`);
-  return all
-    .map((d) => ({ code: String(d.f12), name: String(d.f14), percent: Number(d.f3) }))
-    .filter((d) => Number.isFinite(d.percent));
 }
 
-// 水温 = 上涨板块 / (上涨 + 下跌)，平盘不计入分母。
-// 50 是多空平衡点，越高说明赚钱效应铺得越开。
-function temperatureOf(up, down) {
-  const denom = up + down;
-  if (denom === 0) return 50;
-  return Math.round((up / denom) * 100);
+async function fetchSectors(list) {
+  const body = await getJson(
+    'https://push2.eastmoney.com/api/qt/ulist.np/get' +
+      `?secids=${list.map((s) => s.secid).join(',')}&fields=f3,f12,f13,f14&fltt=2`
+  );
+  const sectors = rowsToSectors(toArray(body), list);
+  // 清单里的板块几乎不会停牌，缺一大截就不是「个别没数据」，
+  // 而是接口没给全或清单过期了 —— 那种情况下算出来的宽度会凭空少掉一块，
+  // 页面上却看不出任何异常，所以宁可当失败处理，沿用旧数据。
+  if (sectors.length < list.length * 0.8) {
+    throw new Error(`板块只拿到 ${sectors.length}/${list.length} 个，数据不完整`);
+  }
+  return sectors;
 }
-
-const MOODS = [
-  { min: 78, key: 'hot', label: '普涨', note: '几乎全线飘红，情绪高位，注意别追高' },
-  { min: 62, key: 'warm', label: '偏暖', note: '多数方向在涨，赚钱效应不错' },
-  { min: 45, key: 'mixed', label: '分化', note: '涨跌各半，是结构性行情，选股比择时重要' },
-  { min: 28, key: 'cool', label: '偏冷', note: '多数方向收绿，缩量观望为主' },
-  { min: 0, key: 'cold', label: '普跌', note: '全线走弱，情绪低位' },
-];
-const moodOf = (t) => MOODS.find((m) => t >= m.min) ?? MOODS[MOODS.length - 1];
 
 function readPrevious() {
   if (!existsSync(outPath)) return null;
@@ -123,20 +118,8 @@ function readPrevious() {
 
 const write = (data) => writeFileSync(outPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
 
-// 指数走 ulist.np，板块走 clist。实测 clist 的限流严得多（分页请求密），
-// 所以两半分开重试、分开降级 —— 板块抓不到不该把能拿到的指数也一起退回旧数据。
-// undici 的 fetch 失败时 e.message 恒为 'fetch failed'，超时 / 被拒 / DNS
-// 全长一个样，真正的原因藏在 e.cause 里。CI 上抓不到时只打印 message，
-// 等于日志什么都没说 —— 这次排查就是卡在这里。
-function reason(e) {
-  const chain = [e?.message ?? String(e)];
-  for (let c = e?.cause, i = 0; c && i < 3; c = c.cause, i++) {
-    const part = [c.name, c.code, c.message].filter(Boolean).join(' ');
-    if (part) chain.push(part);
-  }
-  return chain.join(' ← ');
-}
-
+// 指数和板块现在都走 ulist.np，但仍然分开重试、分开降级 ——
+// 一半抓不到不该把另一半能拿到的也一起退回旧数据。
 async function withRetry(label, fn) {
   let lastError = null;
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
@@ -152,26 +135,12 @@ async function withRetry(label, fn) {
   return null;
 }
 
-function summarize(sectors) {
-  const up = sectors.filter((s) => s.percent > 0).length;
-  const down = sectors.filter((s) => s.percent < 0).length;
-  const flat = sectors.length - up - down;
-  const temperature = temperatureOf(up, down);
-  const byPercent = [...sectors].sort((a, b) => b.percent - a.percent);
-  return {
-    temperature,
-    mood: moodOf(temperature),
-    breadth: { up, down, flat, total: sectors.length },
-    leaders: byPercent.slice(0, 3),
-    laggards: byPercent.slice(-3).reverse(),
-  };
-}
-
 const previous = readPrevious();
 
+const sectorList = readSectorList();
 const indices = await withRetry('指数', fetchIndices);
-if (indices) await sleep(PAGE_GAP_MS);
-const sectors = await withRetry('板块', fetchSectors);
+if (indices && sectorList) await sleep(PAGE_GAP_MS);
+const sectors = sectorList ? await withRetry('板块', () => fetchSectors(sectorList)) : null;
 
 // 两边都没拿到、也没有历史数据 → 占位数据，保证页面能构建
 if (!indices && !sectors && !previous) {

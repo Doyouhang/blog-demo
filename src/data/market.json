@@ -1,21 +1,107 @@
 {
-  "source": "sample",
-  "generatedAt": "1970-01-01T00:00:00.000Z",
-  "stale": true,
-  "temperature": 50,
+  "source": "eastmoney",
+  "generatedAt": "2026-08-28T15:34:22.142Z",
+  "stale": false,
+  "parts": {
+    "indices": true,
+    "sectors": true
+  },
+  "temperature": 69,
   "mood": {
-    "key": "mixed",
-    "label": "分化",
-    "note": "涨跌各半，是结构性行情，选股比择时重要"
+    "min": 62,
+    "key": "warm",
+    "label": "偏暖",
+    "note": "多数方向在涨，赚钱效应不错"
   },
   "breadth": {
-    "up": 0,
-    "down": 0,
+    "up": 340,
+    "down": 156,
     "flat": 0,
-    "total": 0
+    "total": 496
   },
-  "turnover": 0,
-  "indices": [],
-  "leaders": [],
-  "laggards": []
+  "leaders": [
+    {
+      "code": "BK1432",
+      "name": "氮肥",
+      "percent": 7.33
+    },
+    {
+      "code": "BK1341",
+      "name": "房产租赁经纪",
+      "percent": 5.44
+    },
+    {
+      "code": "BK1355",
+      "name": "运动服装",
+      "percent": 5.12
+    }
+  ],
+  "laggards": [
+    {
+      "code": "BK1598",
+      "name": "疫苗",
+      "percent": -3.94
+    },
+    {
+      "code": "BK1600",
+      "name": "医疗研发外包",
+      "percent": -3.64
+    },
+    {
+      "code": "BK1592",
+      "name": "通信线缆及配套",
+      "percent": -3.38
+    }
+  ],
+  "turnover": 2101715024358.6982,
+  "indices": [
+    {
+      "name": "上证指数",
+      "price": 3952.18,
+      "change": -4.39,
+      "percent": -0.11,
+      "amount": 970365152112.9,
+      "market": "CN"
+    },
+    {
+      "name": "深证成指",
+      "price": 13953.07,
+      "change": -95.81,
+      "percent": -0.68,
+      "amount": 1131349872245.798,
+      "market": "CN"
+    },
+    {
+      "name": "创业板指",
+      "price": 3424.4,
+      "change": -48.95,
+      "percent": -1.41,
+      "amount": 548234924269.26,
+      "market": "CN"
+    },
+    {
+      "name": "科创50",
+      "price": 1662.15,
+      "change": -31.33,
+      "percent": -1.85,
+      "amount": 85145085532,
+      "market": "CN"
+    },
+    {
+      "name": "北证50",
+      "price": 1063.8,
+      "change": -11.16,
+      "percent": -1.04,
+      "amount": 16260311448,
+      "market": "CN"
+    },
+    {
+      "name": "恒生指数",
+      "price": 25584.79,
+      "change": 19.05,
+      "percent": 0.07,
+      "amount": 231209336832,
+      "market": "HK"
+    }
+  ]
 }

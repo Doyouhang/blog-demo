@@ -13,8 +13,9 @@
     "studio": "node studio/server.mjs",
     "changelog": "node scripts/changelog.mjs",
     "test:smoke": "node tests/run.mjs",
-    "test:unit": "node --test tests/lib.test.mjs tests/studio.test.mjs",
-    "test": "npm run test:unit && npm run test:smoke"
+    "test:unit": "node --test tests/lib.test.mjs tests/studio.test.mjs tests/market.test.mjs",
+    "test": "npm run test:unit && npm run test:smoke",
+    "refresh:sectors": "node scripts/refresh-sectors.mjs"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.19",
