@@ -1,6 +1,11 @@
 import { chromium } from 'playwright-core';
 
 const BASE = process.env.SMOKE_BASE || process.env.BASE_URL || 'http://localhost:4321';
+// 页面里的站内链接是带 base 的绝对路径（项目页 base=/blog-demo/）。
+// 选择器和断言都得跟着 base 走，否则本地（base=/）全绿、CI（base=/blog-demo/）
+// 一个选择器都匹配不到。
+const PREFIX = new URL(BASE).pathname.replace(/\/+$/, '');
+const at = (p) => PREFIX + p;
 
 // 转场动画期间浏览器用快照层盖住页面，点击落不到真实元素上（约 250ms）。
 // 真实用户在这之后才可能点到，所以测试也等它结束。
@@ -39,13 +44,13 @@ ok('首页侧栏「此刻」+ 行情', sideBoxes.length === 2, sideBoxes.join(' 
 
 // 2. 客户端导航（ClientRouter 生效 = 不发生整页刷新）
 await page.evaluate(() => { window.__stillHere = true; });
-await page.click('.nav-links a[href="/interests/"]');
+await page.click(`.nav-links a[href="${at('/interests/')}"]`);
 await page.waitForSelector('h1:has-text("兴趣分享")');
 const noReload = await page.evaluate(() => window.__stillHere === true);
 ok('跨页转场走客户端导航（无整页刷新）', noReload);
 
 // 3. 客户端导航进 demo 页后，脚本仍然初始化（astro:page-load）
-await page.click('a[href="/interests/music/"]');
+await page.click(`a[href="${at('/interests/music/')}"]`);
 // 换页后脚本要重新加载执行，这里断言它在 100ms 内就绪（实测约 30ms，人眼无感）。
 // 钢琴现在收在折叠彩蛋里，但 data-ready 不该依赖折叠状态 —— 脚本进页面就跑，
 // 不等 details 打开。所以用 attached 而不是默认的 visible，否则测的是「我点得多快」。
@@ -88,9 +93,9 @@ await page.keyboard.up(' ');
 ok('钢琴键盘可操作（空格）', kbd);
 
 // 5. 代码 demo：Worker 沙箱正常输出（含异步）
-await page.click('a[href="/interests/"]');
-await page.waitForSelector('a[href="/interests/coding/"]');
-await page.click('a[href="/interests/coding/"]');
+await page.click(`a[href="${at('/interests/')}"]`);
+await page.waitForSelector(`a[href="${at('/interests/coding/')}"]`);
+await page.click(`a[href="${at('/interests/coding/')}"]`);
 await page.waitForSelector('#run');
 await page.click('#run');
 await page.waitForFunction(() => (document.getElementById('output')?.textContent ?? '').includes('1 + 2 = 3'), null, { timeout: 5000 });
@@ -108,7 +113,7 @@ ok('死循环被超时中止且页面存活', aliveAfterLoop);
 // 7. 主题切换 + 跨页保持
 await page.click('#theme-toggle');
 const themeAfterToggle = await page.getAttribute('html', 'data-theme');
-await page.click('.nav-links a[href="/blog/"]');
+await page.click(`.nav-links a[href="${at('/blog/')}"]`);
 await page.waitForSelector('h1:has-text("博客")');
 const themeAfterNav = await page.getAttribute('html', 'data-theme');
 ok('主题切换生效', themeAfterToggle === 'dark' || themeAfterToggle === 'light', String(themeAfterToggle));
@@ -119,7 +124,7 @@ await page.evaluate(() => { localStorage.setItem('theme', 'light'); document.doc
 // ——— 内容型页面（阶段一新增）———
 await page.goto(BASE + '/moments/', { waitUntil: 'networkidle' });
 ok('时间线页可访问', (await page.title()).includes('此间'), await page.title());
-ok('主导航有此间入口', await page.locator('.nav-links a[href="/moments/"]').count() === 1);
+ok('主导航有此间入口', await page.locator(`.nav-links a[href="${at('/moments/')}"]`).count() === 1);
 // 示例内容是 draft，线上应为空状态而不是报错
 const momentsOk = await page.evaluate(() =>
   !!document.querySelector('.page-head h1') && !document.body.textContent.includes('undefined'));
@@ -162,7 +167,7 @@ ok('375px 窄屏无横向溢出', !overflow);
 
 // 二次进入同一 demo（模块已执行过）仍要立刻可用
 await page.goto(BASE + '/interests/', { waitUntil: 'networkidle' });
-await page.click('a[href="/interests/music/"]');
+await page.click(`a[href="${at('/interests/music/')}"]`);
 await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 200, state: 'attached' });
 await page.click('details.lab summary');
 await waitInteractive(page, '.piano-keys .key.white');
@@ -201,7 +206,8 @@ const rAstro = await doSearch('Astro');
 ok('搜得到文章', rAstro.length > 0, rAstro.length + ' 条');
 // 索引页（标签、列表、首页）不该进索引 —— 它们的内容是详情页的重复，
 // 会稀释结果还抢排名。以前搜 Astro 第一条弹的是标签页。
-ok('结果里没有标签页/列表页', !rAstro.some((u) => /\/tags\/|\/blog\/$|\/interests\/$|^\/$/.test(u)), rAstro[0] ?? '');
+const indexPage = new RegExp(`/tags/|${PREFIX}/blog/$|${PREFIX}/interests/$|^${PREFIX}/$`);
+ok('结果里没有标签页/列表页', !rAstro.some((u) => indexPage.test(u)), rAstro[0] ?? '');
 ok('第一条是详情页', /\/blog\/[^/]+\/$/.test(rAstro[0] ?? ''), rAstro[0] ?? '');
 
 const rZh = await doSearch('周末');
