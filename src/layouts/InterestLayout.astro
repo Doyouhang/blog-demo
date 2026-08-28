@@ -7,11 +7,18 @@ interface Props {
   icon: IconName;
   title: string;
   description?: string;
+  /**
+   * 走宽容器（1120px）。
+   * 索引型的兴趣页（歌单、书架这种双栏带侧栏的）要开，
+   * 纯 demo 页保持窄单栏 —— 这是全站「索引页宽、阅读页窄」规则的一部分。
+   */
+  wide?: boolean;
 }
-const { icon, title, description } = Astro.props;
+const { icon, title, description, wide = false } = Astro.props;
 const B = import.meta.env.BASE_URL;
 ---
-<BaseLayout title={title} description={description ?? `${title}的小 demo`}>
+<BaseLayout title={title} description={description ?? title} fullWidth={wide}>
+  <div class:list={[wide && 'container-wide']}>
   <a class="eyebrow" href={`${B}interests/`}>← 返回兴趣列表</a>
   <div class="demo-head">
     <div class="demo-head-icon" transition:name={`interest-${title}`}>
@@ -23,4 +30,5 @@ const B = import.meta.env.BASE_URL;
     </div>
   </div>
   <slot />
+  </div>
 </BaseLayout>

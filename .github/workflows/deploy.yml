@@ -31,12 +31,21 @@ jobs:
       - run: npm ci
       - name: Type check
         run: npm run check
+      # 纯函数测试：YAML 序列化、slug 派生、EXIF 时区、路径校验。
+      # 不需要浏览器，跑得快，放在最前面挡住低级错误。
+      - name: Unit tests
+        run: npm run test:unit
       # 这两步抓不到数据也不会失败，脚本会退回上一份（页面上会提示）
       - name: Fetch market pulse
         run: npm run fetch:market
       - name: Fetch stock quotes
         run: npm run fetch:stocks
       - run: npm run build
+      # 冒烟跑构建产物。浏览器用 runner 自带的 Chrome，不额外下载。
+      - name: Browser smoke tests
+        run: npm run test:smoke
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

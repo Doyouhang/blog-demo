@@ -70,6 +70,8 @@
   .req { color: #dc2626; }
 
   /* 评分 */
+  .rate-set { border: none; margin: 0 0 16px; padding: 0; }
+  .rate-set legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 5px; }
   .rate { display: flex; gap: 6px; align-items: center; }
   .rate button {
     width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border);
@@ -258,9 +260,16 @@ function field(f) {
     return `<label class="f" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-k="${f.key}" ${String(v) === 'true' || v === true ? 'checked' : ''} style="width:auto" /><span style="margin:0">${f.label}</span></label>`;
   if (f.type === 'rating') {
     const n = Number(v) || 0;
-    return `<label class="f">${head}<span class="rate" data-k="${f.key}">${
-      [1, 2, 3, 4, 5].map((i) => `<button type="button" data-v="${i}" data-on="${i <= n ? 1 : 0}"></button>`).join('')
-    }<button type="button" class="clear" data-v="0">不评分</button></span></label>`;
+    // 用 fieldset 而不是 label：<button> 是可关联标签的元素，
+    // 裹在 <label> 里时点一下「评分」两个字就会激活第一个按钮，把分数悄悄设成 1。
+    // 每个按钮也要有可访问名字，否则读屏软件只会念一串「按钮 按钮 按钮」。
+    return `<fieldset class="f rate-set"><legend>${f.label}</legend>
+      <span class="rate" data-k="${f.key}" role="group" aria-label="${f.label}">${
+      [1, 2, 3, 4, 5]
+        .map((i) => `<button type="button" data-v="${i}" data-on="${i <= n ? 1 : 0}"
+             aria-label="${i} 分" aria-pressed="${i === n}"></button>`)
+        .join('')
+    }<button type="button" class="clear" data-v="0">不评分</button></span></fieldset>`;
   }
   if (f.type === 'ref') {
     const opts = (S.collections[f.refTo] ?? []).map((e) => `<option value="${e.id}"${v === e.id ? ' selected' : ''}>${e.title}</option>`).join('');
@@ -281,10 +290,10 @@ function renderForm() {
     ${t.cover ? `<label class="f"><span>封面</span>
       <div class="cover-box">
         ${cur.cover ? `<img src="/media/${mediaDir}/${String(cur.cover).replace('./', '')}" alt="" />` : ''}
-        <div style="flex:1"><div class="drop" id="drop-cover">拖一张封面进来，或点击选择</div></div>
+        <div style="flex:1"><div class="drop" id="drop-cover" role="button" tabindex="0" aria-label="选择或拖入封面">拖一张封面进来，或点击/按回车选择</div></div>
       </div></label>` : ''}
     ${t.photos ? `<label class="f"><span>照片</span>
-      <div class="drop" id="drop-photos">把照片拖进来（可多张）。会自动压缩，并读出拍摄时间和相机参数。</div>
+      <div class="drop" id="drop-photos" role="button" tabindex="0" aria-label="选择或拖入照片">把照片拖进来（可多张），也可以按回车选择。会自动压缩，并读出拍摄时间和相机参数。</div>
       <div class="shots" id="shots"></div></label>` : ''}
     ${t.bodyLabel ? `<label class="f"><span>${t.bodyLabel}${t.bodyRequired ? ' <span class="req">*</span>' : ''}</span>
       <textarea data-body="1" rows="${cur.type === 'essays' ? 16 : 4}">${escapeHtml(cur.body)}</textarea></label>` : ''}
@@ -344,6 +353,10 @@ function wireDrop(sel, multi) {
     inp.click();
   };
   el.onclick = pick;
+  // 拖拽区原来只响应鼠标，键盘用户没有任何别的方式加图
+  el.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+  };
   el.ondragover = (e) => { e.preventDefault(); el.classList.add('over'); };
   el.ondragleave = () => el.classList.remove('over');
   el.ondrop = (e) => {
@@ -391,6 +404,15 @@ function validate(quiet) {
     if (!String(cur.front[f.key] ?? '').trim()) { log(`「${f.label}」还没填`, 'err'); return false; }
   }
   if (t.bodyRequired && !cur.body.trim() && !quiet) { log(`「${t.bodyLabel}」还没写`, 'err'); return false; }
+  // 照片的 alt 在 schema 里是必填。空着保存能写成文件，但下一次构建会挂在
+  // Zod 校验上 —— 而拖完图不填 alt 恰恰是最自然的操作，等于给自己埋雷。
+  if (t.photos && !quiet) {
+    const missing = cur.photos.findIndex((p) => !String(p.alt ?? '').trim());
+    if (missing >= 0) {
+      log(`第 ${missing + 1} 张照片还没写 alt 描述（读屏软件要用，也是构建必填项）`, 'err');
+      return false;
+    }
+  }
   return true;
 }
 
@@ -443,9 +465,11 @@ async function refresh() {
 
 $('#btn-save').onclick = () => save().catch((e) => log(e.message, 'err'));
 $('#btn-check').onclick = async () => {
-  log('跑 astro check…');
-  const r = await api('/api/check', { method: 'POST' });
-  log(r.ok ? '校验通过' : '校验没过：\n' + r.out, r.ok ? 'ok' : 'err');
+  try {
+    log('跑 astro check…');
+    const r = await api('/api/check', { method: 'POST' });
+    log(r.ok ? '校验通过' : '校验没过：\n' + r.out, r.ok ? 'ok' : 'err');
+  } catch (e) { log(e.message, 'err'); }
 };
 $('#btn-commit').onclick = async () => {
   const msg = prompt('提交信息', `content: 更新${S.types[cur.type].label}`);
@@ -456,8 +480,16 @@ $('#btn-commit').onclick = async () => {
 };
 $('#btn-push').onclick = async () => {
   if (!confirm('推送到 main 会触发 Actions 自动部署，内容会真的上线。确定吗？')) return;
-  try { const r = await api('/api/push', { method: 'POST' }); log('已推送\n' + r.out, 'ok'); await refresh(); }
-  catch (e) { log(e.message, 'err'); }
+  try {
+    // 先跑一遍类型/schema 校验再推。推上去才发现构建挂了，站点就停在旧版本，
+    // 而你以为已经发出去了。宁可在这里多等十几秒。
+    log('推送前先跑一遍校验…');
+    const c = await api('/api/check', { method: 'POST' });
+    if (!c.ok) { log('校验没过，已中止推送：\n' + c.out, 'err'); return; }
+    const r = await api('/api/push', { method: 'POST' });
+    log('已推送\n' + r.out, 'ok');
+    await refresh();
+  } catch (e) { log(e.message, 'err'); }
 };
 
 refresh().then(() => { newEntry(); log('就绪'); }).catch((e) => log(e.message, 'err'));

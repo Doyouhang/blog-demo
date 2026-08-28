@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import exifr from 'exifr';
 import { TYPES } from './schema.mjs';
+import {
+  slugify, uniqueSlug, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
+} from './lib.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -42,59 +45,46 @@ const readBody = (req) =>
     req.on('error', reject);
   });
 
+// ——— 安全 ———
+
+/**
+ * 最后一道闸：确认路径确实落在指定内容目录里面。
+ * 前面已经用 safeSegment 收敛过片段，这里再断言一次 —— 拼路径的地方有好几处，
+ * 将来加新接口时忘了校验，这条能兜住。
+ *
+ * 注意用 base + path.sep 而不是裸前缀匹配：光比 startsWith 的话，
+ * src/content-backup/ 也能通过 src/content 的检查。
+ */
+function assertInside(target, relBase) {
+  const base = path.resolve(ROOT, relBase);
+  const abs = path.resolve(target);
+  if (abs !== base && !abs.startsWith(base + path.sep)) {
+    throw new Error('路径越界：' + abs);
+  }
+  return abs;
+}
+
+/**
+ * 只监听 127.0.0.1 挡不住浏览器。任意网页都能发
+ * fetch('http://127.0.0.1:4331/api/push', {method:'POST', mode:'no-cors'}) ——
+ * 这是简单请求，不触发预检，响应虽然读不到，但**动作已经执行了**，
+ * 也就是说随便一个开着的标签页就能把站部署上线。
+ * 同理 /api/save 配上路径穿越就是任意文件写。
+ *
+ * 校验 Origin 挡掉跨站发起；校验 Host 挡掉 DNS 重绑定
+ * （攻击者把自己的域名解析到 127.0.0.1，Origin 是他的域名，但 Host 也是）。
+ */
+function sameOrigin(req) {
+  const allowed = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`]);
+  const host = req.headers.host ?? '';
+  if (!new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]).has(host)) return false;
+  const origin = req.headers.origin;
+  // 同源的简单 GET 可能不带 Origin；写操作一律要求带且匹配
+  if (req.method !== 'GET') return !!origin && allowed.has(origin);
+  return !origin || allowed.has(origin);
+}
+
 // ——— 内容读写 ———
-
-const slugify = (s) =>
-  String(s).trim().toLowerCase()
-    .replace(/[^\w一-龥-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'untitled';
-
-/** YAML 只用得到这几种标量，手写比拉一个依赖划算；但转义必须严谨 */
-function toYaml(value, indent = 0) {
-  const pad = ' '.repeat(indent);
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '[]';
-    return '\n' + value.map((v) => {
-      if (v && typeof v === 'object') {
-        const inner = toYaml(v, indent + 4).replace(/^\n/, '');
-        return `${pad}  - ${inner.trimStart()}`;
-      }
-      return `${pad}  - ${scalar(v)}`;
-    }).join('\n');
-  }
-  if (value && typeof value === 'object') {
-    return '\n' + Object.entries(value)
-      .filter(([, v]) => v !== undefined && v !== '')
-      .map(([k, v]) => `${pad}${k}:${typeof v === 'object' ? toYaml(v, indent + 2) : ' ' + scalar(v)}`)
-      .join('\n');
-  }
-  return scalar(value);
-}
-function scalar(v) {
-  if (typeof v === 'boolean' || typeof v === 'number') return String(v);
-  const s = String(v);
-  if (s === '') return '""';
-  // 只在真正需要时加引号。这些 md 是要手动看和改的，
-  // 无差别加引号（比如把 ILCE-7CM2 写成 "ILCE-7CM2"）会让文件很难读。
-  // YAML 里 - / : 只在特定位置才有特殊含义，不是出现就危险。
-  const needsQuote =
-    /^[-?:,\[\]{}#&*!|>'"%@`]/.test(s) ||   // 首字符是指示符
-    /:\s|\s#/.test(s) ||                     // 「冒号空格」开新键，「空格井号」开注释
-    /^\s|\s$/.test(s) ||                     // 首尾空白会被吃掉
-    /^(true|false|yes|no|on|off|null|~)$/i.test(s) || // 会被解析成布尔/空
-    /^[+-]?[\d._]+(e[+-]?\d+)?$/i.test(s) || // 会被解析成数字
-    /^\d{4}-\d{2}-\d{2}/.test(s);           // 会被解析成日期/时间戳
-  return needsQuote ? `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : s;
-}
-
-function buildMarkdown(front, body) {
-  const yaml = Object.entries(front)
-    .filter(([, v]) => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
-    .map(([k, v]) => `${k}:${typeof v === 'object' ? toYaml(v, 0) : ' ' + scalar(v)}`)
-    .join('\n');
-  return `---\n${yaml}\n---\n\n${(body ?? '').trim()}\n`;
-}
 
 async function listEntries(typeKey) {
   const t = TYPES[typeKey];
@@ -117,36 +107,9 @@ async function listEntries(typeKey) {
   }
   return out.sort((a, b) => (a.id < b.id ? 1 : -1));
 }
-/**
- * 侧栏列表的标题。长文和收藏用 title 就够，
- * 但 moments 常常同一个地点去很多次，只显示地点会看到一串一模一样的条目 ——
- * 对它来说日期才是辨识度所在。
- */
-function peekTitle(raw, fallback) {
-  const title = raw.match(/^title:\s*"?(.+?)"?\s*$/m)?.[1];
-  if (title) return title;
-  const date = raw.match(/^date:\s*"?(\d{4}-\d{2}-\d{2})/m)?.[1];
-  const place = raw.match(/^place:\s*"?(.+?)"?\s*$/m)?.[1];
-  if (date) return date + (place ? ' · ' + place : '');
-  return place ?? fallback;
-}
 
 // ——— 图片：压缩 + 读 EXIF ———
 
-/**
- * EXIF 的时间不带时区，exifr 默认按 UTC 解析，直接用会整体偏移（东八区差 8 小时）。
- * 所以关掉值转换拿原始字符串，按本机时区还原成快门按下的那个墙上时间。
- */
-function exifLocalTime(rawStr) {
-  const m = String(rawStr ?? '').match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
-  if (!m) return null;
-  const [, Y, M, D, h, mi, s] = m.map(Number);
-  const d = new Date(Y, M - 1, D, h, mi, s);
-  const off = -d.getTimezoneOffset();
-  const sign = off >= 0 ? '+' : '-';
-  const pad = (n) => String(Math.floor(Math.abs(n))).padStart(2, '0');
-  return `${Y}-${pad(M)}-${pad(D)}T${pad(h)}:${pad(mi)}:${pad(s)}${sign}${pad(off / 60)}:${pad(off % 60)}`;
-}
 
 async function processImage(buf, destPath) {
   let raw = {};
@@ -155,18 +118,19 @@ async function processImage(buf, destPath) {
   } catch { /* 没有 EXIF 是常态（截图、别人发的图），不该报错 */ }
 
   const img = sharp(buf, { failOn: 'none' });
-  const meta = await img.metadata();
-  const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
 
+  // fit:'inside' 同时约束两条边，与方向无关。
+  // 原来按 meta.width/height 判断长边是错的：那是**旋转前**的存储尺寸，
+  // 竖构图（6000×4000 + orientation 6）rotate 之后是 4000×6000，
+  // 但代码看到 width >= height，只限了宽，结果出来 1800×2700，长边超了 50%。
   await img
     .rotate() // 按 EXIF orientation 摆正，然后丢掉方向标记，免得下游再转一次
-    .resize({ width: longest > MAX_EDGE ? (meta.width >= meta.height ? MAX_EDGE : undefined) : undefined,
-              height: longest > MAX_EDGE ? (meta.height > meta.width ? MAX_EDGE : undefined) : undefined,
-              withoutEnlargement: true })
+    .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: QUALITY, mozjpeg: true })
     .toFile(destPath);
 
   const after = await stat(destPath);
+  const outMeta = await sharp(destPath).metadata();
   const num = (v) => (v == null || v === '' ? undefined : Number(v));
   const fnum = num(raw.FNumber);
   const exp = num(raw.ExposureTime);
@@ -181,10 +145,11 @@ async function processImage(buf, destPath) {
     },
     shotAt: exifLocalTime(raw.DateTimeOriginal ?? raw.CreateDate),
     // A7C II 机身没有 GPS，多数照片这里是空的；手机拍的通常有
-    gps: raw.GPSLatitude ? { lat: raw.latitude, lon: raw.longitude } : null,
+    // 门要开在客户端实际要读的字段上，否则客户端拿到 gps 却读不到 lat 会抛错
+    gps: raw.latitude != null && raw.longitude != null ? { lat: raw.latitude, lon: raw.longitude } : null,
     bytes: after.size,
-    width: meta.width,
-    height: meta.height,
+    width: outMeta.width,
+    height: outMeta.height,
   };
 }
 
@@ -216,10 +181,24 @@ const routes = {
     const t = TYPES[type];
     if (!t) throw new Error('未知类型：' + type);
 
-    const slug = id || slugify(front.title ?? front.place ?? new Date().toISOString().slice(0, 10));
-    const dir = t.flat ? path.join(ROOT, t.dir) : path.join(ROOT, t.dir, slug);
-    await mkdir(dir, { recursive: true });
-    const file = t.flat ? path.join(dir, slug + '.md') : path.join(dir, t.entry);
+    const fileFor = (slug) =>
+      t.flat ? path.join(ROOT, t.dir, slug + '.md') : path.join(ROOT, t.dir, slug, t.entry);
+
+    let slug;
+    if (id) {
+      // 编辑已有条目：id 直接来自请求体，必须收敛成单级安全名字
+      slug = safeSegment(id);
+      if (!slug) throw new Error('条目 id 不合法：' + id);
+    } else {
+      // 新建：同名的要让路。同一个地点去两次、同一天两条没写地点的动态，
+      // 派生出的 slug 完全一样，直接写就把上一条整个覆盖了 —— 连照片都变孤儿。
+      const base = slugify(front.title ?? front.place ?? new Date().toISOString().slice(0, 10));
+      slug = uniqueSlug(base, (s) => existsSync(fileFor(s)));
+    }
+
+    const file = fileFor(slug);
+    assertInside(file, t.dir);
+    await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, buildMarkdown(front, bodyText), 'utf8');
     return { ok: true, id: slug, file: path.relative(ROOT, file) };
   },
@@ -231,7 +210,15 @@ const routes = {
     const t = TYPES[type];
     if (!t) throw new Error('未知类型：' + type);
 
-    const dir = t.flat ? path.join(ROOT, t.dir) : path.join(ROOT, t.dir, slug);
+    let dir;
+    if (t.flat) {
+      dir = path.join(ROOT, t.dir);
+    } else {
+      const safe = safeSegment(slug);
+      if (!safe) throw new Error('slug 不合法：' + slug);
+      dir = path.join(ROOT, t.dir, safe);
+    }
+    assertInside(dir, t.dir);
     await mkdir(dir, { recursive: true });
     const base = slugify(name.replace(/\.[^.]+$/, '')) + '-' + Date.now().toString(36);
     const dest = path.join(dir, base + '.jpg');
@@ -242,7 +229,9 @@ const routes = {
   'POST /api/commit': async (body) => {
     const { message } = JSON.parse(body);
     if (!message?.trim()) throw new Error('提交信息不能为空');
-    await git('add', '-A');
+    // 只交内容目录。原来是 git add -A，会把手头没写完的代码改动一起提交，
+    // 再点「发布上线」就直接推到 main 部署了 —— 一个标着「提交」的按钮不该干这个。
+    await git('add', '--', 'src/content');
     await git('commit', '-m', message.trim());
     return { ok: true, git: await gitStatus() };
   },
@@ -267,6 +256,12 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const key = `${req.method} ${url.pathname}`;
 
+  if (!sameOrigin(req)) {
+    return json(res, 403, {
+      error: '请求来源不对。这个服务只接受本机浏览器从 http://127.0.0.1:' + PORT + ' 发出的请求。',
+    });
+  }
+
   try {
     if (routes[key]) {
       const body = req.method === 'POST' ? await readBody(req) : null;
@@ -280,13 +275,20 @@ const server = createServer(async (req, res) => {
         return res.end(html);
       }
       if (url.pathname.startsWith('/media/')) {
-        // 只允许读内容目录下的图，防止路径穿越
+        // 只允许读内容目录下的图。用 assertInside 而不是裸 startsWith ——
+        // 后者连 src/content-backup/ 都会放行。
         const rel = decodeURIComponent(url.pathname.slice('/media/'.length));
-        const abs = path.resolve(ROOT, 'src/content', rel);
-        if (!abs.startsWith(path.resolve(ROOT, 'src/content')) || !existsSync(abs)) {
+        let abs;
+        try {
+          abs = assertInside(path.resolve(ROOT, 'src/content', rel), 'src/content');
+        } catch {
           return json(res, 404, { error: 'not found' });
         }
-        res.writeHead(200, { 'content-type': 'image/jpeg' });
+        // 只服务图片。原来任何文件（含 .md）都按 image/jpeg 吐出去。
+        const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+        const type = MIME[path.extname(abs).toLowerCase()];
+        if (!type || !existsSync(abs)) return json(res, 404, { error: 'not found' });
+        res.writeHead(200, { 'content-type': type });
         return res.end(await readFile(abs));
       }
     }
@@ -294,6 +296,16 @@ const server = createServer(async (req, res) => {
   } catch (e) {
     json(res, 500, { error: e.message });
   }
+});
+
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`\n  端口 ${PORT} 已被占用。`);
+    console.error('  可能是上一个 studio 没退干净：pkill -f "studio/server.mjs"');
+    console.error(`  或者换一个：STUDIO_PORT=4341 npm run studio\n`);
+    process.exit(1);
+  }
+  throw e;
 });
 
 server.listen(PORT, '127.0.0.1', () => {

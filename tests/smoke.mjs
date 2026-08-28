@@ -16,8 +16,13 @@ const results = [];
 const ok = (name, pass, extra = '') =>
   results.push(`${pass ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome' });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome' });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+
+// 跑到一半抛异常时（选择器超时之类）要把已有结果打出来、把浏览器关掉，
+// 否则既看不到进度，chromium 还会留在后台。
+let crashed = null;
+try {
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
@@ -209,6 +214,20 @@ ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').
 
 ok('运行期间无 JS 报错', errors.length === 0, errors.slice(0, 3).join(' | '));
 
-await browser.close();
+} catch (e) {
+  crashed = e;
+} finally {
+  await browser.close().catch(() => {});
+}
+
 console.log('\n' + results.join('\n'));
-console.log('\n失败项：' + results.filter((r) => r.startsWith('❌')).length);
+const failed = results.filter((r) => r.startsWith('❌')).length;
+console.log('\n失败项：' + failed);
+
+if (crashed) {
+  console.error('\n测试中断：' + (crashed.stack ?? crashed.message));
+}
+
+// **退出码必须反映结果。** 原来只打印不退出，永远返回 0 ——
+// 挂到 CI 上会永远是绿的，等于没测。
+if (failed > 0 || crashed) process.exit(1);

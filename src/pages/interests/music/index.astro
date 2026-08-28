@@ -17,7 +17,7 @@ const stories = (await getCollection('essays', ({ data }) => !data.draft && data
 // 关联只存在 item 一侧，这里解析成链接传给卡片
 const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
 ---
-<InterestLayout icon="headphones" title="音乐" description="循环过的歌攒成歌单，有故事的单独讲。">
+<InterestLayout wide icon="headphones" title="音乐" description="循环过的歌攒成歌单，有故事的单独讲。">
   <div class="split">
     <div class="split-main">
       <div class="sec-hd">

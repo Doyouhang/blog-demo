@@ -32,7 +32,7 @@ const doneThisYear = books.filter(
 
 const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
 ---
-<InterestLayout icon="book" title="读书" description="读到的书都记在书架上，值得说几句的会单写一篇。">
+<InterestLayout wide icon="book" title="读书" description="读到的书都记在书架上，值得说几句的会单写一篇。">
   <div class="split">
     <div class="split-main">
       {books.length === 0 ? (
