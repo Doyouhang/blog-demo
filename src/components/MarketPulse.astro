@@ -10,6 +10,8 @@ interface MarketData {
   source: string;
   generatedAt: string;
   stale?: boolean;
+  /** 这次构建里哪半边是真抓到的。指数走 ulist、板块走 clist，分开抓也分开降级 */
+  parts?: { indices: boolean; sectors: boolean };
   /** 0–100，上涨板块占比。50 是多空平衡点 */
   temperature: number;
   mood: { key: string; label: string; note: string };
@@ -22,12 +24,28 @@ interface MarketData {
 }
 
 const m = marketData as MarketData;
-const hasData = m.breadth.total > 0;
+// 指数和板块是分开抓、分开降级的，展示上也必须分开。
+// 以前这里写的是 hasData = m.breadth.total > 0 —— 整张卡片被板块一票否决，
+// 结果 CI 上 6 个指数明明抓到了，页面还是一片「还没有抓到大盘数据」。
+const hasBreadth = m.breadth.total > 0;
+const hasIndices = m.indices.length > 0;
+const hasData = hasBreadth || hasIndices;
+// 老数据没有 parts 字段，用现有内容反推，不至于误报「没取到」
+const parts = m.parts ?? { indices: hasIndices, sectors: hasBreadth };
+const missing = [!parts.indices && '指数', !parts.sectors && '板块'].filter(Boolean).join('与');
 
 const updated = new Date(m.generatedAt).toLocaleString('zh-CN', {
   timeZone: 'Asia/Shanghai',
   hour12: false,
 });
+
+// 提示语在这里拼好再塞进模板：写成多行 JSX 的话，中文标点之间会被
+// HTML 的换行折成一个空格，渲染出「板块数据， 这部分」这种断句
+const reused = (!parts.sectors && hasBreadth) || (!parts.indices && hasIndices);
+const missingTip = missing
+  ? `这次构建没能取到${missing}数据，` +
+    (reused ? `相关部分沿用上一次的（${updated}）。` : '这部分暂时空着。')
+  : '';
 
 const dirOf = (n: number) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');
 const sign = (n: number, digits = 2) => (n > 0 ? '+' : '') + n.toFixed(digits);
@@ -59,12 +77,13 @@ const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
       <span class="when">{updated}</span>
     </div>
 
-    {m.stale && (
+    {missingTip && (
       <div class="sample-tip">
-        <Icon name="alert" size={15} /> 这次构建没能连上行情接口，下面是上一次抓到的大盘数据（{updated}）。
+        <Icon name="alert" size={15} /> {missingTip}
       </div>
     )}
 
+    {hasBreadth && (<Fragment>
     <div class="temp">
       <div class="temp-num">
         <b class={dirOf(m.temperature - 50)}>{m.temperature}</b><i>°</i>
@@ -97,6 +116,8 @@ const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
       </p>
     </div>
 
+    </Fragment>)}
+
     {m.indices.length > 0 && (
       <div class="idx">
         {m.indices.map((i) => (
@@ -127,7 +148,8 @@ const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
     )}
 
     <p class="footnote">
-      水温 = 上涨板块 ÷（上涨 + 下跌），平盘不计入，50 为多空平衡点。数据为延迟行情，仅供兴趣展示。
+      {hasBreadth && '水温 = 上涨板块 ÷（上涨 + 下跌），平盘不计入，50 为多空平衡点。'}
+      数据为延迟行情，仅供兴趣展示。
     </p>
   </div>
 )}

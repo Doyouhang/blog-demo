@@ -110,7 +110,12 @@ function readPrevious() {
   if (!existsSync(outPath)) return null;
   try {
     const prev = JSON.parse(readFileSync(outPath, 'utf8'));
-    return prev?.breadth && Array.isArray(prev?.indices) ? prev : null;
+    if (!prev?.breadth || !Array.isArray(prev?.indices)) return null;
+    // 占位数据不是「上一次抓到的数据」。CI 每次都是全新 checkout，
+    // 仓库里躺着的永远是这份 sample —— 把它当历史沿用，页面就会拿着
+    // 0 个板块和 1970 年的时间戳装作有数据，而且永远不会自愈。
+    if (prev.source === 'sample') return null;
+    return prev;
   } catch {
     return null;
   }
@@ -120,6 +125,18 @@ const write = (data) => writeFileSync(outPath, JSON.stringify(data, null, 2) + '
 
 // 指数走 ulist.np，板块走 clist。实测 clist 的限流严得多（分页请求密），
 // 所以两半分开重试、分开降级 —— 板块抓不到不该把能拿到的指数也一起退回旧数据。
+// undici 的 fetch 失败时 e.message 恒为 'fetch failed'，超时 / 被拒 / DNS
+// 全长一个样，真正的原因藏在 e.cause 里。CI 上抓不到时只打印 message，
+// 等于日志什么都没说 —— 这次排查就是卡在这里。
+function reason(e) {
+  const chain = [e?.message ?? String(e)];
+  for (let c = e?.cause, i = 0; c && i < 3; c = c.cause, i++) {
+    const part = [c.name, c.code, c.message].filter(Boolean).join(' ');
+    if (part) chain.push(part);
+  }
+  return chain.join(' ← ');
+}
+
 async function withRetry(label, fn) {
   let lastError = null;
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
@@ -127,11 +144,11 @@ async function withRetry(label, fn) {
       return await fn();
     } catch (e) {
       lastError = e;
-      console.warn(`[market] ${label} 第 ${attempt}/${ATTEMPTS} 次失败：${e.message}`);
+      console.warn(`[market] ${label} 第 ${attempt}/${ATTEMPTS} 次失败：${reason(e)}`);
       if (attempt < ATTEMPTS) await sleep(2000 * attempt);
     }
   }
-  console.warn(`[market] ${label} 放弃：${lastError?.message ?? '未知原因'}`);
+  console.warn(`[market] ${label} 放弃：${lastError ? reason(lastError) : '未知原因'}`);
   return null;
 }
 
@@ -162,6 +179,7 @@ if (!indices && !sectors && !previous) {
     source: 'sample',
     generatedAt: new Date().toISOString(),
     stale: true,
+    parts: { indices: false, sectors: false },
     temperature: 50,
     mood: moodOf(50),
     breadth: { up: 0, down: 0, flat: 0, total: 0 },
@@ -192,22 +210,28 @@ const turnover = idxPart
 
 // 只要有一半用了旧数据就算 stale，页面会挂提示 —— 宁可多提示，不能让人以为是今天的
 const stale = !indices || !sectors;
+// 哪半边是这次真抓到的。页面据此分区展示：板块没抓到不该把指数一起藏了。
+const parts = { indices: !!indices, sectors: !!sectors };
 
 write({
   source: 'eastmoney',
-  // 全新抓到才更新时间戳；部分降级时保留旧时间，免得页面显示「刚更新」却是半新半旧
-  generatedAt: stale ? (previous?.generatedAt ?? new Date().toISOString()) : new Date().toISOString(),
+  // 有任何一半是新抓的，时间戳就是现在；具体哪部分是旧的由 parts 明说，
+  // 不靠一个含糊的旧时间戳去暗示
+  generatedAt: new Date().toISOString(),
   stale,
+  parts,
   ...sectorPart,
   turnover,
   indices: idxPart,
 });
 
-const { up, down, flat } = sectorPart.breadth;
+const { up, down, flat, total } = sectorPart.breadth;
+const breadthText = total > 0
+  ? `水温 ${sectorPart.temperature}（${sectorPart.mood.label}） · 板块 ${up}涨/${down}跌/${flat}平`
+  : '板块无数据（本次没抓到，也没有可沿用的历史）';
 console.log(
-  `[market] 水温 ${sectorPart.temperature}（${sectorPart.mood.label}）` +
-    ` · 板块 ${up}涨/${down}跌/${flat}平 · 指数 ${idxPart.length} 个` +
+  `[market] ${breadthText} · 指数 ${idxPart.length} 个` +
     ` · 两市成交 ${(turnover / 1e12).toFixed(2)} 万亿` +
-    (stale ? `  ← 部分沿用旧数据（指数${indices ? '新' : '旧'}/板块${sectors ? '新' : '旧'}）` : '')
+    (stale ? `  ← 本次抓取：指数${parts.indices ? '成功' : '失败'}/板块${parts.sectors ? '成功' : '失败'}` : '')
 );
 process.exit(0);
