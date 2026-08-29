@@ -1,0 +1,81 @@
+---
+// 随机选片：从「想看」里挑，正好对应「今晚看啥」这个真实场景。
+//
+// 和读书页那个 BookPicker 不一样，这里的片单是从内容集合里读的，不是写死在脚本里。
+// 写死的那种，文案说着「从我的片单里抽」，抽的却是另一份清单，
+// 你往片单里加了什么它永远不知道。
+import { getCollection } from 'astro:content';
+import Icon from './Icon.astro';
+
+const want = (await getCollection('items', ({ data }) =>
+  !data.draft && data.kind === 'movie' && data.status === 'want'
+)).map((m) => ({ title: m.data.title, creator: m.data.creator }));
+---
+
+<div class="demo-card movie-picker" data-movies={JSON.stringify(want)}>
+  {want.length === 0 ? (
+    <p class="demo-hint center">
+      「想看」列表还空着。标几部想看的片子，这里就能帮你挑了。
+    </p>
+  ) : (
+    <>
+      <div id="movie" class="demo-result" aria-live="polite">
+        <div class="result-icon"><Icon name="play" size={34} /></div>
+        <div style="margin-top:8px;color:var(--muted)">点下面的按钮，从想看列表里抽一部</div>
+      </div>
+      <div class="demo-row" style="justify-content:center">
+        <button id="pick-movie" class="demo-btn" type="button"><Icon name="dice" size={16} />今晚看这部</button>
+      </div>
+      <p class="demo-hint center">
+        想看列表里有 <span id="movie-count">{want.length}</span> 部。
+      </p>
+    </>
+  )}
+</div>
+
+<style>
+  .demo-result .movie-title { font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .demo-result .movie-by { color: var(--muted); font-size: 14px; margin-top: 4px; }
+</style>
+
+<script>
+  import { onPageReady, markReady } from '../scripts/init';
+
+  function initMoviePicker() {
+    const card = document.querySelector<HTMLElement>('.movie-picker');
+    if (!markReady(card)) return;
+
+    let movies: { title: string; creator: string }[] = [];
+    try { movies = JSON.parse(card!.dataset.movies ?? '[]'); } catch { return; }
+    if (movies.length === 0) return;   // 空列表时按钮压根没渲染
+
+    const box = document.getElementById('movie');
+    const btn = document.getElementById('pick-movie');
+    if (!box || !btn) return;
+
+    const iconTemplate = box.querySelector('.result-icon');
+    let last = -1;
+
+    btn.addEventListener('click', () => {
+      let i = Math.floor(Math.random() * movies.length);
+      // 只有一部的时候不能错开，否则永远抽不出来
+      if (i === last && movies.length > 1) i = (i + 1) % movies.length;
+      last = i;
+      const m = movies[i];
+
+      // 重建内容，让 .demo-result 的入场动画重新播一遍
+      const icon = iconTemplate?.cloneNode(true);
+      box.replaceChildren();
+      if (icon) box.append(icon);
+      const t = document.createElement('div');
+      t.className = 'movie-title';
+      t.textContent = `《${m.title}》`;
+      const by = document.createElement('div');
+      by.className = 'movie-by';
+      by.textContent = m.creator;
+      box.append(t, by);
+    });
+  }
+
+  onPageReady(initMoviePicker);
+</script>

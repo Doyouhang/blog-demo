@@ -326,7 +326,8 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
 /* 通栏色带：靠 BaseLayout 的 fullWidth 让页面自己接管容器 */
 .band { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .band-inner { padding: 60px 0; }
-.int-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+/* 列数跟着 interests 的条数走：现在是 6 个，正好铺满一行 */
+.int-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 .int-cell {
   display: flex; flex-direction: column; align-items: center; gap: 9px;
   padding: 20px 8px; border-radius: var(--radius); color: inherit;

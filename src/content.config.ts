@@ -13,26 +13,26 @@ const essays = defineCollection({
     title: z.string(),
     description: z.string(),
     pubDate: z.coerce.date(),
-    topic: z.enum(['blog', 'music', 'reading', 'cooking', 'coding']).default('blog'),
+    topic: z.enum(['blog', 'music', 'reading', 'watching', 'cooking', 'coding']).default('blog'),
     tags: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
   }),
 });
 
-/** 收藏条目：歌、书（将来加影视也放这里，只需扩 kind）。 */
+/** 收藏条目：歌、书、影视。加新类型只需扩 kind，页面各取各的。 */
 const items = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/items' }),
   schema: ({ image }) =>
     z.object({
-      kind: z.enum(['song', 'book']),
+      kind: z.enum(['song', 'book', 'movie']),
       title: z.string(),
       creator: z.string(),
       cover: image().optional(),
-      // 歌：听到的时间；书：读完的时间，在读的书用开始时间
+      // 歌：听到的时间；书 / 影视：看完读完的时间，在读在看的用开始时间
       date: z.coerce.date(),
       rating: z.number().min(1).max(5).optional(),
       blurb: z.string(),
-      // 书架分区用；歌不需要，留空即可
+      // 书架 / 片单分区用；歌不需要，留空即可
       status: z.enum(['want', 'doing', 'done']).optional(),
       // 关联长文。**只在这一侧存**，长文那边需要时反查 ——
       // 两边都存必然有一天不同步。reference() 让指向不存在的 slug 在构建期就报错。

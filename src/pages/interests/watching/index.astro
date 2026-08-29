@@ -1,0 +1,91 @@
+---
+import InterestLayout from '../../../layouts/InterestLayout.astro';
+import ItemCard from '../../../components/ItemCard.astro';
+import DemoToggle from '../../../components/DemoToggle.astro';
+import MoviePicker from '../../../components/MoviePicker.astro';
+import { getCollection } from 'astro:content';
+
+const B = import.meta.env.BASE_URL;
+
+const movies = (await getCollection('items', ({ data }) => !data.draft && data.kind === 'movie')).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+const notes = (await getCollection('essays', ({ data }) => !data.draft && data.topic === 'watching')).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+
+// 片单按状态分区。没填 status 的当作看完 —— 补录旧片时最省事的默认。
+// 剧集不单独分类：「在看」天然覆盖追剧，多一层反而让条目少的时候页面很空。
+const SECTIONS = [
+  { key: 'doing', label: '在看' },
+  { key: 'done', label: '看完' },
+  { key: 'want', label: '想看' },
+] as const;
+const shelf = SECTIONS.map((s) => ({
+  ...s,
+  list: movies.filter((m) => (m.data.status ?? 'done') === s.key),
+})).filter((s) => s.list.length > 0);
+
+const thisYear = new Date().getFullYear();
+const doneThisYear = movies.filter(
+  (m) => (m.data.status ?? 'done') === 'done' && m.data.date.getFullYear() === thisYear
+).length;
+
+const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
+---
+<InterestLayout wide icon="play" title="影视" description="看过的电影剧集记成片单，想细说的单写一篇。">
+  <div class="split">
+    <div class="split-main">
+      {movies.length === 0 ? (
+        <p class="empty">片单还是空的。在 <code>src/content/items/</code> 加一个 <code>kind: movie</code> 的文件即可。</p>
+      ) : (
+        shelf.map((s) => (
+          <section class="shelf">
+            <div class="sec-hd">
+              <h2>{s.label}</h2>
+              <span class="sec-note">{s.list.length} 部</span>
+            </div>
+            {s.list.map((m) => <ItemCard item={m} essayHref={hrefOf(m.data.essay?.id)} />)}
+          </section>
+        ))
+      )}
+    </div>
+
+    <aside>
+      <section class="side-box">
+        <h2>今年</h2>
+        <div class="side-row"><span>看完</span><span class="side-val">{doneThisYear} 部</span></div>
+        <div class="side-row"><span>片单</span><span class="side-val">{movies.length} 部</span></div>
+      </section>
+
+      <section class="side-box">
+        <h2>观后感</h2>
+        {notes.length === 0 ? (
+          <p class="side-foot">还没写过。写一篇 <code>topic: watching</code> 的长文就会出现在这里。</p>
+        ) : (
+          <>
+            {notes.map((e) => (
+              <div class="side-row">
+                <a href={`${B}blog/${e.id}/`}>{e.data.title}</a>
+              </div>
+            ))}
+            <p class="side-foot">共 {notes.length} 篇</p>
+          </>
+        )}
+      </section>
+    </aside>
+  </div>
+
+  <DemoToggle icon="dice" label="顺手玩玩：今晚看啥">
+    <MoviePicker />
+  </DemoToggle>
+</InterestLayout>
+
+<style>
+  .shelf + .shelf { margin-top: 28px; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .empty code, .side-foot code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+  }
+</style>

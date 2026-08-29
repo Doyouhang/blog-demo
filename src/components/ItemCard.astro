@@ -1,5 +1,5 @@
 ---
-// 收藏条目卡：歌和书共用。
+// 收藏条目卡：歌、书、影视共用。
 // 没封面的条目留出等宽空位而不是顶到最左 —— 列表里有封面没封面混排时，
 // 标题不在同一条竖线上会很难扫。留白但不画假的占位封面。
 import { Image } from 'astro:assets';
@@ -13,19 +13,24 @@ interface Props {
 const { item, essayHref } = Astro.props;
 const { kind, title, creator, cover, date, rating, blurb, status } = item.data;
 
-const STATUS_LABEL = { want: '想读', doing: '在读', done: '读完' } as const;
+// 同一组状态，书和影视的说法不一样；歌没有状态
+const STATUS_LABEL = {
+  book: { want: '想读', doing: '在读', done: '读完' },
+  movie: { want: '想看', doing: '在看', done: '看完' },
+} as const;
+const statusLabel = status ? STATUS_LABEL[kind === 'movie' ? 'movie' : 'book'][status] : null;
 const when = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
 ---
 <article class:list={['item', !cover && 'item-bare']}>
   {cover && (
     <div class="item-cover">
-      <Image src={cover} alt={`《${title}》封面`} width={160} height={213} />
+      <Image src={cover} alt={`《${title}》${kind === "movie" ? "海报" : "封面"}`} width={160} height={213} />
     </div>
   )}
   <div class="item-body">
     <h3>
-      {kind === 'book' ? `《${title}》` : title}
-      {status && <span class="badge">{STATUS_LABEL[status]}</span>}
+      {kind === 'song' ? title : `《${title}》`}
+      {statusLabel && <span class="badge">{statusLabel}</span>}
     </h3>
     <p class="meta">
       <span>{creator}</span>

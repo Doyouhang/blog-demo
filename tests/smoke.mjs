@@ -37,7 +37,7 @@ ok('首页加载', await page.title() === '迩迩的小站', await page.title())
 
 // 1. 首页兴趣卡片是深链，不是列表页
 const cards = await page.$$eval('.int-row a.int-cell', (els) => els.map((e) => e.getAttribute('href')));
-ok('首页兴趣全展示（5 个，无「查看全部」）', cards.length === 5, cards.length + ' 个');
+ok('首页兴趣全展示（无「查看全部」）', cards.length === 6, cards.length + ' 个');
 ok('首页兴趣卡片深链', cards.every((h) => /\/interests\/\w+\/$/.test(h ?? '')), cards[0] ?? '');
 const sideBoxes = await page.$$eval('.side-box h2', (els) => els.map((e) => e.textContent?.trim()));
 ok('首页侧栏「此刻」+ 行情', sideBoxes.length === 2, sideBoxes.join(' / '));
@@ -140,7 +140,27 @@ const pianoHidden = await page.evaluate(() => {
 ok('彩蛋默认收起', pianoHidden);
 
 await page.goto(BASE + '/interests/reading/', { waitUntil: 'networkidle' });
-ok('读书页有书架结构', await page.locator('details.lab').count() === 1);
+ok('读书页彩蛋收在折叠里', await page.locator('details.lab').count() === 1);
+
+// ——— 影视页 ———
+await page.goto(BASE + '/interests/watching/', { waitUntil: 'networkidle' });
+ok('影视页可访问', (await page.title()).includes('影视'), await page.title());
+ok('影视页彩蛋收在折叠里', await page.locator('details.lab').count() === 1);
+// 示例内容是 draft，线上片单为空，该出空状态而不是报错或空白
+const watchingOk = await page.evaluate(() => {
+  // InterestLayout 没有 .page-head（那是 moments 页的布局），直接取 h1
+  const h1 = document.querySelector('h1')?.textContent ?? '';
+  return h1.includes('影视') && !document.body.textContent.includes('undefined');
+});
+ok('影视页空状态正常渲染', watchingOk);
+// 片单空的时候彩蛋不该给一个点了没反应的按钮
+await page.click('details.lab summary');
+const pickerState = await page.evaluate(() => {
+  const card = document.querySelector('.movie-picker');
+  if (!card) return 'no-card';
+  return document.getElementById('pick-movie') ? 'has-button' : 'empty-hint';
+});
+ok('片单为空时彩蛋给提示而不是死按钮', pickerState === 'empty-hint', pickerState);
 
 // 合并掉的两个页面不该再构建出来。
 // 用独立 page 去撞 404 —— 主 page 上挂着「运行期间无 JS 报错」的 console 收集器，

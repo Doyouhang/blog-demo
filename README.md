@@ -209,7 +209,9 @@ export const OG_IMAGE = 'og.png';
 | 首页「此刻」在读什么、在听什么 | `src/data/now.json` |
 | 兴趣卡片（增 / 删 / 改文案） | `src/data/interests.ts` |
 | 自选股清单 | `src/data/stocks.watchlist.json` |
-| 发文章、改标签 | `src/content/posts/*.md` |
+| 发文章、写观后感读后感 | `src/content/essays/*.md` |
+| 书架 / 片单 / 歌单的条目 | `src/content/items/*.md` |
+| 「此间」的图文动态 | `src/content/moments/<条目>/` |
 | 关于页正文 | `src/pages/about.astro` |
 | 配色、圆角、动效时长 | `src/styles/global.css` 顶部的设计令牌 |
 | 图标 | `src/components/icons.ts` |
@@ -221,13 +223,14 @@ export const OG_IMAGE = 'og.png';
 
 ### 写新文章
 
-在 `src/content/posts/` 新建一个 `.md`，头部写好 frontmatter：
+在 `src/content/essays/` 新建一个 `.md`，头部写好 frontmatter：
 
 ```md
 ---
 title: 文章标题
 description: 一句话简介，会显示在列表和分享卡片里
 pubDate: 2026-08-03
+topic: blog          # blog / music / reading / watching / cooking / coding
 tags: ['标签1', '标签2']
 draft: false
 ---
@@ -235,9 +238,34 @@ draft: false
 正文用 Markdown 写……
 ```
 
+- `topic` 决定这篇长文挂在哪儿：`blog` 只进博客列表，其余的会同时出现在对应
+  兴趣页的侧栏（比如 `watching` 出现在影视页的「观后感」里）。
 - `draft: true` 的文章不会出现在列表、标签页和 RSS 里，适合写一半先存着。
 - 标签不用登记，写进 `tags` 就自动出现在标签云和 `/blog/tags/<标签>/` 页面。
 - 文件名就是 URL：`hello.md` → `/blog/hello/`。用英文短横线命名，别用中文和空格。
+
+### 书架 / 片单 / 歌单：加一条
+
+三者共用 `src/content/items/`，靠 `kind` 区分，页面各取各的：
+
+```md
+---
+kind: movie          # book / song / movie
+title: 让子弹飞
+creator: 姜文        # 书填作者，歌填歌手，影视填导演
+date: 2026-08-22     # 看完 / 读完的时间；在看在读的填开始时间
+status: done         # want 想看 / doing 在看 / done 看完；不填按 done 算
+rating: 5            # 1–5，可不填
+blurb: 一句话短评。
+essay: some-slug     # 可选，关联一篇长文（只在这一侧写）
+draft: false
+---
+```
+
+- `essay` 指向 `src/content/essays/` 里的文件名。指错了**构建期就会报错**，
+  不会等到线上才发现空链接。
+- 电影和剧集不分家，都写 `kind: movie` ——「在看」天然覆盖追剧。
+- 封面 / 海报把图片放同目录，写 `cover: ./xxx.jpg` 即可，构建时自动压缩。
 
 ### 首页「此刻」
 
@@ -282,6 +310,9 @@ draft: false
 
 `slug` 必须和目录名一致，否则首页卡片会点进 404。首页兴趣区是**全部展示**、不分页的，
 加到十几个会把那一整条色带撑得很长，到时候再考虑折叠。
+
+首页那排卡片的列数写在 `src/styles/global.css` 的 `.int-row` 里（现在是 6 列，
+正好放下现有的 6 个）。加减兴趣时顺手改一下，不然右边会空出格子。
 
 如果这个兴趣页要写交互脚本，务必用 `src/scripts/init.ts` 的 `onPageReady`，原因见上面那节坑。
 

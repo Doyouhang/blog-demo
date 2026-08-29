@@ -21,6 +21,11 @@ export const interests: Interest[] = [
     tags: ['书架', '读后感'],
   },
   {
+    icon: 'play', slug: 'watching', title: '影视',
+    desc: '看过的电影剧集记成片单，想细说的单写一篇。',
+    tags: ['片单', '观后感'],
+  },
+  {
     icon: 'headphones', slug: 'music', title: '音乐',
     desc: '循环过的歌攒成歌单，有故事的单独讲。',
     tags: ['歌单', '故事'],

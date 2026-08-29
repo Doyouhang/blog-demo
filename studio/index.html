@@ -206,6 +206,15 @@ function load(id) {
   renderForm(); renderList();
 }
 
+// onlyWhen 写成 { kind: 'book' } 或 { kind: ['book', 'movie'] }。
+// 三处判断以前各写一遍、都只认单值，加影视时 status 就会在影视条目上消失。
+function shows(f) {
+  if (!f.onlyWhen) return true;
+  const [k, want] = Object.entries(f.onlyWhen)[0];
+  const now = String(cur.front[k] ?? '');
+  return Array.isArray(want) ? want.map(String).includes(now) : now === String(want);
+}
+
 function field(f) {
   const v = cur.front[f.key] ?? '';
   const req = f.required ? ' <span class="req">*</span>' : '';
@@ -244,7 +253,7 @@ const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&am
 
 function renderForm() {
   const t = S.types[cur.type];
-  const visible = t.fields.filter((f) => !f.onlyWhen || String(cur.front[Object.keys(f.onlyWhen)[0]]) === Object.values(f.onlyWhen)[0]);
+  const visible = t.fields.filter(shows);
   const mediaDir = t.flat ? t.dir.split('/').pop() : `${t.dir.split('/').pop()}/${cur.id ?? ''}`;
 
   $('#form').innerHTML = `<div class="form-inner">
@@ -363,7 +372,7 @@ function validate(quiet) {
   const t = S.types[cur.type];
   for (const f of t.fields) {
     if (!f.required) continue;
-    if (f.onlyWhen && String(cur.front[Object.keys(f.onlyWhen)[0]]) !== Object.values(f.onlyWhen)[0]) continue;
+    if (!shows(f)) continue;
     if (!String(cur.front[f.key] ?? '').trim()) { log(`「${f.label}」还没填`, 'err'); return false; }
   }
   if (t.bodyRequired && !cur.body.trim() && !quiet) { log(`「${t.bodyLabel}」还没写`, 'err'); return false; }
@@ -383,7 +392,7 @@ function buildFront() {
   const t = S.types[cur.type];
   const front = {};
   for (const f of t.fields) {
-    if (f.onlyWhen && String(cur.front[Object.keys(f.onlyWhen)[0]]) !== Object.values(f.onlyWhen)[0]) continue;
+    if (!shows(f)) continue;
     let v = cur.front[f.key];
     if (v === '' || v == null) continue;
     if (f.type === 'datetime') {
