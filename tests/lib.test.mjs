@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   slugify, uniqueSlug, scalar, toYaml, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
-  parseExifOffset, sniffIsoBmff,
+  parseExifOffset, sniffIsoBmff, unquote, parseFront, parsePhotos,
 } from '../studio/lib.mjs';
 
 test('scalar: 多行文本必须转义，不能产出裸换行', () => {
@@ -137,4 +137,91 @@ test('sniffIsoBmff: 认出 HEIC 和 AVIF，放过普通图片', () => {
   assert.equal(sniffIsoBmff(Buffer.from('\x89PNG\r\n\x1a\n' + 'x'.repeat(8), 'latin1')), null);
   assert.equal(sniffIsoBmff(Buffer.from([1, 2, 3])), null);   // 太短不能越界
   assert.equal(sniffIsoBmff(null), null);
+});
+
+test('unquote: 是 scalar 的逆运算，三样转义都要还原', () => {
+  assert.equal(unquote('"第一行\\n第二行"'), '第一行\n第二行');
+  assert.equal(unquote('"说\\"你好\\""'), '说"你好"');
+  assert.equal(unquote('"C:\\\\Users"'), 'C:\\Users');
+  assert.equal(unquote('没有引号就原样'), '没有引号就原样');
+});
+
+test('unquote: 转义的反斜杠后跟 n，不能被当成换行', () => {
+  // 分别 replace 会踩这个坑：先还原 \\ 得到 \n，再还原 \n 就变成了换行。
+  // 必须单次扫描。
+  assert.equal(unquote('"C:\\\\next"'), 'C:\\next');
+  assert.ok(!unquote('"C:\\\\next"').includes('\n'), '不该出现真换行');
+});
+
+test('往返：写出去再读回来，标量内容一模一样', () => {
+  const front = {
+    title: '说"你好"的那本书',
+    blurb: '第一行\n第二行',
+    path: 'C:\\Users\\me',
+    tags: ['科幻', '值得重读'],
+  };
+  const { front: back, body } = parseFront(buildMarkdown(front, '正文内容'));
+  assert.equal(back.title, front.title);
+  assert.equal(back.blurb, front.blurb, '换行必须还原成真换行');
+  assert.equal(back.path, front.path, '反斜杠不能变多');
+  assert.deepEqual(back.tags, front.tags);
+  assert.equal(body, '正文内容');
+});
+
+test('往返幂等：反复编辑同一条，内容不能越改越歪', () => {
+  // 这条是「已发布的东西还能再编辑」的底线。
+  // unquote 少还原一样转义的话，每保存一次就多一层反斜杠，
+  // 而页面上、文件里都看不出哪里不对，等发现时已经积了好几层。
+  const front = { title: '带"引号"和\\反斜杠', blurb: '多行\n短评' };
+  const once = buildMarkdown(parseFront(buildMarkdown(front, '正文')).front, '正文');
+  const twice = buildMarkdown(parseFront(once).front, '正文');
+  const thrice = buildMarkdown(parseFront(twice).front, '正文');
+  assert.equal(twice, once, '第二次编辑后应与第一次完全相同');
+  assert.equal(thrice, once, '第三次也是');
+});
+
+test('parseFront: photos 那种对象数组不交给浅解析器', () => {
+  const md = buildMarkdown(
+    { date: '2026-08-25', photos: [{ src: './a.jpg', alt: '街角', exif: { camera: 'PJD110' } }] },
+    ''
+  );
+  const { front } = parseFront(md);
+  assert.equal(front.date, '2026-08-25');
+  assert.equal(front.photos, undefined, 'photos 该留给 parsePhotos');
+  const photos = parsePhotos(md);
+  assert.equal(photos.length, 1);
+  assert.equal(photos[0].src, './a.jpg');
+  assert.equal(photos[0].alt, '街角');
+  assert.equal(photos[0].exif.camera, 'PJD110', 'EXIF 要原样保住');
+});
+
+test('parsePhotos: alt 里有引号和换行也要能读回来', () => {
+  const md = buildMarkdown(
+    { photos: [{ src: './b.jpg', alt: '写着"营业中"的招牌' }] },
+    ''
+  );
+  assert.equal(parsePhotos(md)[0].alt, '写着"营业中"的招牌');
+});
+
+test('parseFront: 认得手写的行内数组，别把标签压成一个字符串', () => {
+  // 仓库里原有的文章是手写的，标签写成 tags: ['随笔', '建站']；
+  // buildMarkdown 写出来的却是多行 - 形式。只认后者的话，
+  // 用编辑器打开一篇手写的旧文章再保存，标签就变成了一行字符串，
+  // 页面上那篇文章的标签云当场少掉两个，而 md 看着还挺正常。
+  const md = `---\ntitle: 建站\ntags: ['随笔', '建站']\ndraft: false\n---\n\n正文\n`;
+  const { front } = parseFront(md);
+  assert.deepEqual(front.tags, ['随笔', '建站']);
+  assert.equal(front.title, '建站');
+});
+
+test('parseFront: 行内数组的双引号和空数组', () => {
+  assert.deepEqual(parseFront('---\ntags: ["a", "b"]\n---\n').front.tags, ['a', 'b']);
+  assert.deepEqual(parseFront('---\ntags: []\n---\n').front.tags, []);
+});
+
+test('往返：手写的行内数组读进来再写出去，内容不丢', () => {
+  const md = `---\ntitle: 建站\ntags: ['随笔', '建站']\n---\n\n正文\n`;
+  const { front, body } = parseFront(md);
+  const { front: back } = parseFront(buildMarkdown(front, body));
+  assert.deepEqual(back.tags, ['随笔', '建站'], '过一轮编辑器不能丢标签');
 });

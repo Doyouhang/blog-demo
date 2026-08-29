@@ -126,6 +126,91 @@ export function exifLocalTime(rawStr, offsetMinutes) {
 }
 
 /**
+ * scalar 的逆运算。**这两个必须成对改** —— scalar 转义了三样东西
+ * （反斜杠、双引号、换行），只还原其中一样的话，编辑一次就多一层反斜杠：
+ *
+ *     "第一行\n第二行"  →  第一行\n第二行（字面）  →  "第一行\\n第二行"  →  …
+ *
+ * 换行则永久变成字面的两个字符。所以必须单次扫描，不能分别 replace ——
+ * 分开做的话 \\n（转义的反斜杠后面跟个 n）会被误当成换行。
+ */
+export function unquote(s) {
+  const str = String(s ?? '');
+  const m = str.match(/^"([\s\S]*)"$/);
+  if (!m) return str;
+  return m[1].replace(/\\(.)/g, (_, c) =>
+    (c === 'n' ? '\n' : c === 'r' ? '\r' : c === 't' ? '\t' : c));
+}
+
+/**
+ * 手写的 md 里数组常写成行内形式 tags: ['随笔', '建站']，
+ * 而 buildMarkdown 写出来的是多行 - 形式。两种都得认 ——
+ * 只认后者的话，用编辑器打开一篇手写的旧文章再保存，
+ * 整个数组会被当成一个字符串存回去，标签就此消失。
+ * 不是数组字面量就返回 null，交给调用方按标量处理。
+ */
+function parseInlineArray(v) {
+  if (!/^\[[\s\S]*\]$/.test(v)) return null;
+  const inner = v.slice(1, -1).trim();
+  if (inner === '') return [];
+  // 这些 md 的数组项都是简单标量，不会出现带逗号的引号串，按逗号切就够
+  return inner
+    .split(',')
+    .map((x) => unquote(x.trim().replace(/^'([\s\S]*)'$/, '$1')))
+    .filter((x) => x !== '');
+}
+
+/**
+ * 读回 buildMarkdown 写出的文件。够用就行：这些 md 都是本工具写的。
+ * photos 那种对象数组这里不还原，交给 parsePhotos —— 它要保住 EXIF 原样。
+ */
+export function parseFront(raw) {
+  const m = String(raw ?? '').match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!m) return { front: {}, body: String(raw ?? '').trim() };
+  const front = {};
+  let key = null;
+  let nested = false;
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^(\w+):\s*(.*)$/);
+    if (kv) {
+      key = kv[1];
+      const v = kv[2].trim();
+      if (v === '') { front[key] = []; nested = true; }
+      else { front[key] = parseInlineArray(v) ?? unquote(v); nested = false; }
+      continue;
+    }
+    if (!nested || !key) continue;
+    const item = line.match(/^\s+-\s+(.*)$/);
+    if (!item) continue;
+    // 「- src: ./a.jpg」这种是对象数组的头一行，不是标量项
+    if (/^\w+:\s/.test(item[1])) { delete front[key]; nested = false; continue; }
+    front[key].push(unquote(item[1]));
+  }
+  return { front, body: m[2].trim() };
+}
+
+/**
+ * photos 是嵌套结构，上面那个浅解析器还原不出来。
+ * 只解析到「有哪几张图 + alt」，EXIF 原样保留 —— 重新保存时不会把相机信息弄丢。
+ */
+export function parsePhotos(raw) {
+  const seg = String(raw ?? '').match(/^photos:\n([\s\S]*?)(?=^\w+:|^---)/m);
+  if (!seg) return [];
+  const out = [];
+  for (const block of seg[1].split(/^\s+- /m).slice(1)) {
+    const src = block.match(/src:\s*(.+)/)?.[1]?.trim();
+    const alt = unquote(block.match(/alt:\s*(.+)/)?.[1]?.trim() ?? '');
+    const exif = {};
+    for (const k of ['camera', 'lens', 'focal', 'aperture', 'shutter', 'iso']) {
+      const v = block.match(new RegExp(k + ':\\s*(.+)'))?.[1]?.trim();
+      if (v) exif[k] = k === 'iso' ? Number(unquote(v)) : unquote(v);
+    }
+    if (src) out.push({ src: unquote(src), alt, exif: Object.keys(exif).length ? exif : undefined });
+  }
+  return out;
+}
+
+/**
  * EXIF 的 OffsetTimeOriginal 形如 "+09:00" / "-05:00"，换算成分钟。
  * 手机基本都会写这个字段，相机常常不写 —— 不写的时候返回 null，
  * 由调用方回退到本机时区（在家门口拍的照片，这个回退是对的）。

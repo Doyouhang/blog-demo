@@ -159,3 +159,37 @@ test('普通 JPEG 照常处理，EXIF 时区跟着照片走', async () => {
   assert.match(data.src, /\.jpg$/, '存盘一律 .jpg');
   rmSync(path.join(ROOT, 'src/content/moments/jpeg-probe'), { recursive: true, force: true });
 });
+
+test('已有条目能读回来再编辑，反复保存内容不走样', async () => {
+  // 「已发布的东西还能改」这条路的底线：读回来的内容必须和写进去的一致，
+  // 而且再保存一次不能把内容改坏。客户端以前自己解析一份 md，
+  // 转义规则和服务端的 scalar 对不上，多行短评每编辑一次就多一层反斜杠。
+  const front = {
+    date: '2026-08-25T10:00:00+08:00',
+    place: '说"你好"的那条街',
+    draft: true,
+  };
+  const bodyText = '第一行\n\n第二段';
+  const r1 = await post('/api/save', { type: 'moments', id: null, front, bodyText });
+  assert.equal(r1.status, 200);
+  const id = r1.data.id;
+  created.push(id);
+
+  const file = path.join(ROOT, 'src/content/moments', id, 'index.md');
+  const afterFirst = readFileSync(file, 'utf8');
+
+  // 从 /api/state 读回来（走的正是客户端载入编辑用的那条路）
+  const state = await fetch(B + '/api/state', { headers: { origin: B } }).then((x) => x.json());
+  const entry = state.collections.moments.find((e) => e.id === id);
+  assert.ok(entry, '列表里要能找到刚存的条目');
+  assert.equal(entry.front.place, front.place, '带引号的地点要原样读回来');
+  assert.equal(entry.body, bodyText.trim(), '正文要原样读回来');
+
+  // 拿读回来的东西原样再存一次 —— 文件应当一个字节都不变
+  const r2 = await post('/api/save', {
+    type: 'moments', id, front: { ...entry.front, draft: true }, bodyText: entry.body,
+  });
+  assert.equal(r2.status, 200);
+  assert.equal(r2.data.id, id, '编辑要落回同一个文件，不能派生出新条目');
+  assert.equal(readFileSync(file, 'utf8'), afterFirst, '再保存一次内容不该有任何变化');
+});

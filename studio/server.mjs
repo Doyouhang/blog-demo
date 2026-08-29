@@ -15,7 +15,7 @@ import exifr from 'exifr';
 import { TYPES } from './schema.mjs';
 import {
   slugify, uniqueSlug, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
-  parseExifOffset, sniffIsoBmff,
+  parseExifOffset, sniffIsoBmff, parseFront, parsePhotos,
 } from './lib.mjs';
 
 const run = promisify(execFile);
@@ -87,6 +87,14 @@ function sameOrigin(req) {
 
 // ——— 内容读写 ———
 
+// 解析放在服务端做，和 buildMarkdown 在同一个模块里 ——
+// 序列化和反序列化必须成对，分居两处迟早失配（客户端那份就漏还原了两种转义，
+// 编辑一次多一层反斜杠）。现在它们由同一组往返测试锁着。
+const parsed = (raw) => {
+  const { front, body } = parseFront(raw);
+  return { front, body, photos: parsePhotos(raw) };
+};
+
 async function listEntries(typeKey) {
   const t = TYPES[typeKey];
   const dir = path.join(ROOT, t.dir);
@@ -97,13 +105,13 @@ async function listEntries(typeKey) {
     if (t.flat) {
       if (!n.isFile() || !n.name.endsWith('.md')) continue;
       const raw = await readFile(path.join(dir, n.name), 'utf8');
-      out.push({ id: n.name.replace(/\.md$/, ''), title: peekTitle(raw, n.name), raw });
+      out.push({ id: n.name.replace(/\.md$/, ''), title: peekTitle(raw, n.name), ...parsed(raw) });
     } else {
       if (!n.isDirectory()) continue;
       const f = path.join(dir, n.name, t.entry);
       if (!existsSync(f)) continue;
       const raw = await readFile(f, 'utf8');
-      out.push({ id: n.name, title: peekTitle(raw, n.name), raw });
+      out.push({ id: n.name, title: peekTitle(raw, n.name), ...parsed(raw) });
     }
   }
   return out.sort((a, b) => (a.id < b.id ? 1 : -1));

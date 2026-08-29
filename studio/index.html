@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Studio · 迩迩的小站</title>
+<link rel="icon" href="data:," />
+  <title>Studio · 迩迩的小站</title>
 <style>
   :root {
     --bg: #fdfdfd; --panel: #fff; --fg: #1f2328; --muted: #65707a;
@@ -144,46 +145,8 @@ const api = async (path, opts) => {
   return d;
 };
 
-// ——— 解析已有 md（够用就行：这些文件都是本工具写的） ———
-function parseMd(raw) {
-  const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!m) return { front: {}, body: raw };
-  const front = {};
-  let key = null;
-  for (const line of m[1].split('\n')) {
-    const kv = line.match(/^(\w+):\s*(.*)$/);
-    if (kv) {
-      key = kv[1];
-      const v = kv[2].trim();
-      front[key] = v === '' ? [] : unquote(v);
-    } else if (key && /^\s+-\s/.test(line)) {
-      if (!Array.isArray(front[key])) front[key] = [];
-      front[key].push(unquote(line.replace(/^\s+-\s*/, '')));
-    }
-  }
-  return { front, body: m[2].trim() };
-}
-const unquote = (s) => s.replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"');
-
-// photos 是嵌套结构，上面那个浅解析器还原不出来。
-// 编辑已有 moment 时从原文里把 photos 段整体抠出来，只解析到「有哪几张图 + alt」，
-// EXIF 原样保留 —— 重新保存时不会把相机信息弄丢。
-function parsePhotos(raw) {
-  const seg = raw.match(/^photos:\n([\s\S]*?)(?=^\w+:|^---)/m);
-  if (!seg) return [];
-  const out = [];
-  for (const block of seg[1].split(/^\s+- /m).slice(1)) {
-    const src = block.match(/src:\s*(.+)/)?.[1]?.trim();
-    const alt = unquote(block.match(/alt:\s*(.+)/)?.[1]?.trim() ?? '');
-    const exif = {};
-    for (const k of ['camera', 'lens', 'focal', 'aperture', 'shutter', 'iso']) {
-      const v = block.match(new RegExp(k + ':\\s*(.+)'))?.[1]?.trim();
-      if (v) exif[k] = k === 'iso' ? Number(unquote(v)) : unquote(v);
-    }
-    if (src) out.push({ src: unquote(src), alt, exif: Object.keys(exif).length ? exif : undefined });
-  }
-  return out;
-}
+// md 的解析在服务端做（studio/lib.mjs），和写入是同一组往返测试锁着的。
+// 客户端再解析一份的话，两边转义规则一失配就会把内容改坏。
 
 // ——— 渲染 ———
 function renderTypes() {
@@ -201,7 +164,7 @@ function renderList() {
   $('#list').innerHTML =
     `<button class="new">＋ 新建</button>` +
     items.map((e) => {
-      const isDraft = /^draft:\s*true/m.test(e.raw);
+      const isDraft = e.front?.draft === true || String(e.front?.draft) === 'true';
       return `<button data-id="${e.id}" class="${isDraft ? 'draft' : ''}" aria-current="${e.id === cur.id}">${e.title}</button>`;
     }).join('');
   $('#list').onclick = (e) => {
@@ -229,11 +192,11 @@ function newEntry() {
 function load(id) {
   const e = (S.collections[cur.type] ?? []).find((x) => x.id === id);
   if (!e) return;
-  const { front, body } = parseMd(e.raw);
+  const front = { ...(e.front ?? {}) };
   cur = {
     type: cur.type, id,
-    front, body,
-    photos: S.types[cur.type].photos ? parsePhotos(e.raw) : [],
+    front, body: e.body ?? '',
+    photos: S.types[cur.type].photos ? (e.photos ?? []) : [],
     cover: front.cover ?? null,
   };
   // datetime-local 不认 ISO 里的时区后缀，截到分钟
