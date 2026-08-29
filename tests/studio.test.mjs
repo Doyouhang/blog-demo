@@ -116,3 +116,46 @@ test('正常请求不受影响', async () => {
   const d = await r.json();
   assert.deepEqual(Object.keys(d.types).sort(), ['essays', 'items', 'moments']);
 });
+
+test('上传 HEIC 要给人话，不能把编解码器的报错原样甩出来', async () => {
+  // sharp 对 HEIC 抛的是「Support for this compression format has not been built in」。
+  // 那句话对着看没人猜得到该去关手机相机里的「高效率格式」开关。
+  const probeDir = path.join(ROOT, 'src/content/moments/heic-probe');
+  rmSync(probeDir, { recursive: true, force: true });   // 不靠上一次跑完的状态
+  const heic = Buffer.concat([
+    Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftyp'), Buffer.from('heic'), Buffer.alloc(8),
+  ]);
+  const r = await fetch(
+    B + '/api/upload?type=moments&slug=heic-probe&name=IMG_20260828.heic',
+    { method: 'POST', headers: { origin: B, 'content-type': 'application/octet-stream' }, body: heic }
+  );
+  const data = await r.json().catch(() => ({}));
+  assert.equal(r.status, 500);
+  assert.match(data.error ?? '', /HEIC/, '错误里要点名格式');
+  assert.match(data.error ?? '', /高效率格式|JPG/, '要说清楚该怎么办');
+  assert.doesNotMatch(data.error ?? '', /compression format has not been built/, '不能透出编解码器原文');
+  // 连目录都不该留下 —— 格式检查要发生在动文件系统之前
+  assert.equal(existsSync(probeDir), false);
+});
+
+test('普通 JPEG 照常处理，EXIF 时区跟着照片走', async () => {
+  // 手机会写 OffsetTimeOriginal，相机通常不写。不认这个字段的话，
+  // 出门在外拍的照片导进来会整体差掉时差那几个小时。
+  const sharp = (await import('sharp')).default;
+  const jpeg = await sharp({ create: { width: 900, height: 600, channels: 3, background: '#456' } })
+    .withExif({
+      IFD0: { Make: 'OPPO', Model: 'PJD110' },
+      IFD2: { DateTimeOriginal: '2026:08:28 14:30:22', OffsetTimeOriginal: '+09:00' },
+    })
+    .jpeg().toBuffer();
+  const r = await fetch(
+    B + '/api/upload?type=moments&slug=jpeg-probe&name=IMG_20260828.jpg',
+    { method: 'POST', headers: { origin: B, 'content-type': 'application/octet-stream' }, body: jpeg }
+  );
+  const data = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(data));
+  assert.equal(data.exif?.camera, 'PJD110');
+  assert.equal(data.shotAt, '2026-08-28T14:30:22+09:00');
+  assert.match(data.src, /\.jpg$/, '存盘一律 .jpg');
+  rmSync(path.join(ROOT, 'src/content/moments/jpeg-probe'), { recursive: true, force: true });
+});

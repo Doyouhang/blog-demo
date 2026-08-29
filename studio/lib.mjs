@@ -126,6 +126,36 @@ export function exifLocalTime(rawStr, offsetMinutes) {
 }
 
 /**
+ * EXIF 的 OffsetTimeOriginal 形如 "+09:00" / "-05:00"，换算成分钟。
+ * 手机基本都会写这个字段，相机常常不写 —— 不写的时候返回 null，
+ * 由调用方回退到本机时区（在家门口拍的照片，这个回退是对的）。
+ */
+export function parseExifOffset(str) {
+  const m = String(str ?? '').match(/^([+-])(\d{2}):?(\d{2})$/);
+  if (!m) return null;
+  const [, sign, h, mi] = m;
+  const minutes = Number(h) * 60 + Number(mi);
+  if (!Number.isFinite(minutes) || minutes > 14 * 60) return null; // 现实中最大是 +14:00
+  return sign === '-' ? -minutes : minutes;
+}
+
+/**
+ * 认出 HEIC/HEIF 这类 ISO BMFF 图片。
+ * sharp 的 format 表会说 heif「可读」，但那只代表认得容器 —— libheif 是模块化的，
+ * 这个预编译包没带 HEVC 解码插件，真喂给它会抛
+ * 「Support for this compression format has not been built in」，
+ * 对着这句话没人猜得到该去关手机相机里的「高效率格式」开关。
+ */
+export function sniffIsoBmff(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf.toString('latin1', 4, 8) !== 'ftyp') return null;
+  const brand = buf.toString('latin1', 8, 12);
+  if (brand === 'avif' || brand === 'avis') return 'AVIF';
+  const HEIF = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1'];
+  return HEIF.includes(brand) ? 'HEIC/HEIF' : null;
+}
+
+/**
  * 把用户给的路径片段收敛成安全的单级名字。
  * type 是查表来的所以安全，但 id / slug 直接来自请求体和查询串，
  * 不收拾就能用 ../../ 写到 src/content 外面去。

@@ -15,6 +15,7 @@ import exifr from 'exifr';
 import { TYPES } from './schema.mjs';
 import {
   slugify, uniqueSlug, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
+  parseExifOffset, sniffIsoBmff,
 } from './lib.mjs';
 
 const run = promisify(execFile);
@@ -143,7 +144,12 @@ async function processImage(buf, destPath) {
       shutter: exp ? (exp >= 1 ? `${exp}s` : `1/${Math.round(1 / exp)}s`) : undefined,
       iso: num(raw.ISO ?? raw.ISOSpeedRatings ?? raw.PhotographicSensitivity),
     },
-    shotAt: exifLocalTime(raw.DateTimeOriginal ?? raw.CreateDate),
+    // 手机会写 OffsetTimeOriginal，相机通常不写。不用它的话，
+    // 出门在外拍的照片会按本机时区换算，整体差掉时差那几个小时。
+    shotAt: exifLocalTime(
+      raw.DateTimeOriginal ?? raw.CreateDate,
+      parseExifOffset(raw.OffsetTimeOriginal ?? raw.OffsetTime) ?? undefined
+    ),
     // A7C II 机身没有 GPS，多数照片这里是空的；手机拍的通常有
     // 门要开在客户端实际要读的字段上，否则客户端拿到 gps 却读不到 lat 会抛错
     gps: raw.latitude != null && raw.longitude != null ? { lat: raw.latitude, lon: raw.longitude } : null,
@@ -218,6 +224,17 @@ const routes = {
       if (!safe) throw new Error('slug 不合法：' + slug);
       dir = path.join(ROOT, t.dir, safe);
     }
+    // 先认格式，再动文件系统 —— 否则一张传不了的图会留下一个空目录。
+    // sharp 对 HEIC 抛的是编解码插件层面的错，原样透给前端
+    // 等于让人对着一句天书猜自己该干嘛。
+    const bmff = sniffIsoBmff(body);
+    if (bmff) {
+      throw new Error(
+        `这张是 ${bmff} 格式，当前环境解不了。` +
+        '手机上关掉相机设置里的「高效率格式 / HEIF」改存 JPG，或者先把这张转成 JPG 再传。'
+      );
+    }
+
     assertInside(dir, t.dir);
     await mkdir(dir, { recursive: true });
     const base = slugify(name.replace(/\.[^.]+$/, '')) + '-' + Date.now().toString(36);

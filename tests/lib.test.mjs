@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   slugify, uniqueSlug, scalar, toYaml, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
+  parseExifOffset, sniffIsoBmff,
 } from '../studio/lib.mjs';
 
 test('scalar: 多行文本必须转义，不能产出裸换行', () => {
@@ -95,4 +96,45 @@ test('peekTitle: moments 靠日期区分，不是只看地点', () => {
   const b = 'date: "2026-08-26T10:00:00+08:00"\nplace: 上海 · 武康路\n';
   assert.notEqual(peekTitle(a, 'x'), peekTitle(b, 'y'), '同一地点的两条不能显示成一样');
   assert.equal(peekTitle('title: 万历十五年\n', 'x'), '万历十五年');
+});
+
+test('parseExifOffset: 认得手机写的时区偏移', () => {
+  assert.equal(parseExifOffset('+09:00'), 540);
+  assert.equal(parseExifOffset('+08:00'), 480);
+  assert.equal(parseExifOffset('-05:00'), -300);
+  assert.equal(parseExifOffset('+0530'), 330);   // 有些机型不带冒号
+  assert.equal(parseExifOffset('+00:00'), 0);
+});
+
+test('parseExifOffset: 认不出来要返回 null 而不是 0', () => {
+  // 返回 0 会被当成 UTC，照片时间整体差八小时；返回 null 才能回退到本机时区。
+  assert.equal(parseExifOffset(undefined), null);
+  assert.equal(parseExifOffset(''), null);
+  assert.equal(parseExifOffset('随便什么'), null);
+  assert.equal(parseExifOffset('+99:00'), null);  // 现实中最大 +14:00
+});
+
+test('exifLocalTime: 给了偏移就按偏移算，不看本机时区', () => {
+  // 出门在外拍的照片：EXIF 里的墙上时间是当地的，时区也是当地的。
+  // 忽略 OffsetTimeOriginal 的话，回家一导入就整体差掉时差。
+  assert.equal(exifLocalTime('2026:08:28 14:30:22', 9 * 60), '2026-08-28T14:30:22+09:00');
+  assert.equal(exifLocalTime('2026:08:28 14:30:22', -5 * 60), '2026-08-28T14:30:22-05:00');
+  assert.equal(exifLocalTime('2026:08:28 14:30:22', 0), '2026-08-28T14:30:22+00:00');
+});
+
+test('sniffIsoBmff: 认出 HEIC 和 AVIF，放过普通图片', () => {
+  // sharp 的 format 表会说 heif「可读」，但预编译包没带 HEVC 解码插件，
+  // 真喂进去抛的是「Support for this compression format has not been built in」，
+  // 对着那句话没人猜得到该去关手机相机里的「高效率格式」。
+  const bmff = (brand) => Buffer.concat([
+    Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftyp'), Buffer.from(brand), Buffer.alloc(8),
+  ]);
+  assert.equal(sniffIsoBmff(bmff('heic')), 'HEIC/HEIF');
+  assert.equal(sniffIsoBmff(bmff('mif1')), 'HEIC/HEIF');
+  assert.equal(sniffIsoBmff(bmff('avif')), 'AVIF');
+  // JPEG / PNG 必须放行
+  assert.equal(sniffIsoBmff(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])), null);
+  assert.equal(sniffIsoBmff(Buffer.from('\x89PNG\r\n\x1a\n' + 'x'.repeat(8), 'latin1')), null);
+  assert.equal(sniffIsoBmff(Buffer.from([1, 2, 3])), null);   // 太短不能越界
+  assert.equal(sniffIsoBmff(null), null);
 });
