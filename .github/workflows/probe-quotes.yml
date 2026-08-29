@@ -1,0 +1,60 @@
+# 探测哪些行情源在 GitHub runner 上能通。
+#
+# 背景：runner 的出口 IP（Azure 那批）被东方财富的 WAF 拦了，push2 上所有接口
+# 一律 502 —— 不是限流（那会直接断连），也不是封境外（同在境外的其他机器正常）。
+# 这个 workflow 只做一件事：把候选源挨个试一遍，打出状态码。
+#
+# 手动触发：Actions → Probe quote sources → Run workflow
+name: Probe quote sources
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: 出口 IP
+        run: curl -s --max-time 15 https://api.ipify.org || echo "(取不到)"
+      - name: 挨个试
+        run: |
+          node -e '
+          const CASES = [
+            ["东财 push2 · 指数",       "https://push2.eastmoney.com/api/qt/ulist.np/get?secids=1.000001,0.399001&fields=f2,f3,f12,f13,f14&fltt=2"],
+            ["东财 push2 · 板块",       "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&fid=f3&fs=m:90+t:2&fields=f3,f12,f14&fltt=2"],
+            ["东财 push2delay · 指数",  "https://push2delay.eastmoney.com/api/qt/ulist.np/get?secids=1.000001,0.399001&fields=f2,f3,f12,f13,f14&fltt=2"],
+            ["东财 push2delay · 板块",  "https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&fid=f3&fs=m:90+t:2&fields=f3,f12,f14&fltt=2"],
+            ["东财 80.push2",           "https://80.push2.eastmoney.com/api/qt/ulist.np/get?secids=1.000001&fields=f2,f3,f12,f13,f14&fltt=2"],
+            ["东财 quote 页面",         "https://quote.eastmoney.com/zs000001.html"],
+            ["腾讯 qt.gtimg.cn",        "https://qt.gtimg.cn/q=sh000001,sz399001"],
+            ["新浪 hq.sinajs.cn",       "https://hq.sinajs.cn/list=sh000001"],
+          ];
+          const reason = (e) => {
+            const c = [e?.message ?? String(e)];
+            for (let x = e?.cause, i = 0; x && i < 3; x = x.cause, i++) {
+              const p = [x.name, x.code, x.message].filter(Boolean).join(" ");
+              if (p) c.push(p);
+            }
+            return c.join(" <- ");
+          };
+          (async () => {
+            for (const [name, url] of CASES) {
+              try {
+                const r = await fetch(url, {
+                  headers: { "User-Agent": "Mozilla/5.0", Referer: "https://finance.sina.com.cn/" },
+                  signal: AbortSignal.timeout(20000),
+                });
+                const body = await r.text();
+                const peek = body.slice(0, 90).replace(/\s+/g, " ");
+                console.log(`${r.ok ? "OK  " : "FAIL"} ${String(r.status).padEnd(4)} ${name.padEnd(24)} ${peek}`);
+              } catch (e) {
+                console.log(`ERR       ${name.padEnd(24)} ${reason(e)}`);
+              }
+              await new Promise((r) => setTimeout(r, 1200));
+            }
+          })();
+          '
