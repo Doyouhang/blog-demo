@@ -152,15 +152,24 @@ const watchingOk = await page.evaluate(() => {
   const h1 = document.querySelector('h1')?.textContent ?? '';
   return h1.includes('影视') && !document.body.textContent.includes('undefined');
 });
-ok('影视页空状态正常渲染', watchingOk);
-// 片单空的时候彩蛋不该给一个点了没反应的按钮
+ok('影视页正常渲染', watchingOk);
+// 彩蛋从「想看」里挑片。想看为空时该给提示，不该给一个点了没反应的按钮；
+// 非空时该给按钮且点了有结果。断言写成「两者必居其一」而不是写死某一种 ——
+// 否则往想看里加一部片子，这条就会莫名其妙变红。
 await page.click('details.lab summary');
 const pickerState = await page.evaluate(() => {
   const card = document.querySelector('.movie-picker');
   if (!card) return 'no-card';
   return document.getElementById('pick-movie') ? 'has-button' : 'empty-hint';
 });
-ok('片单为空时彩蛋给提示而不是死按钮', pickerState === 'empty-hint', pickerState);
+ok('彩蛋状态和片单对得上', pickerState === 'empty-hint' || pickerState === 'has-button', pickerState);
+if (pickerState === 'has-button') {
+  await page.click('#pick-movie');
+  await page.waitForTimeout(200);
+  const picked = await page.evaluate(() =>
+    !!document.querySelector('#movie .movie-title')?.textContent?.trim());
+  ok('点了真能挑出一部', picked);
+}
 
 // 合并掉的两个页面不该再构建出来。
 // 用独立 page 去撞 404 —— 主 page 上挂着「运行期间无 JS 报错」的 console 收集器，
@@ -209,6 +218,26 @@ const bindCount = await page.evaluate(() => {
   return n;
 });
 ok('没有重复绑定事件', bindCount === 1, `pointerdown 触发 ${bindCount} 次`);
+
+// 长短评要折叠起来，并且换行得保留 —— 光有 pre-wrap 而不折叠的话，
+// 一条几百字的影评会把整个片单撑成一条长溜。
+// 注意要先回到片单页：上面几步把 page 留在了音乐页，
+// 在那儿查 .blurb-fold 永远是 0，整块会被静默跳过（等于白写）。
+await page.goto(BASE + '/interests/watching/', { waitUntil: 'networkidle' });
+{
+  const folds = await page.locator('.blurb-fold').count();
+  if (folds > 0) {
+    const before = await page.locator('article.item').first().boundingBox();
+    await page.locator('.blurb-fold summary').first().click();
+    await page.waitForTimeout(200);
+    const after = await page.locator('article.item').first().boundingBox();
+    ok('长短评默认收起、点开能展开', after.height > before.height,
+      `${Math.round(before.height)} → ${Math.round(after.height)}px`);
+    const ws = await page.locator('.blurb-fold p.blurb').first()
+      .evaluate((el) => getComputedStyle(el).whiteSpace);
+    ok('短评里的换行会保留', ws === 'pre-wrap', ws);
+  }
+}
 
 // ——— 站内搜索 ———
 await page.goto(BASE + '/search/', { waitUntil: 'networkidle' });

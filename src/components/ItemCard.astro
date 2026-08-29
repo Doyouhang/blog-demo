@@ -19,6 +19,14 @@ const STATUS_LABEL = {
   movie: { want: '想看', doing: '在看', done: '看完' },
 } as const;
 const statusLabel = status ? STATUS_LABEL[kind === 'movie' ? 'movie' : 'book'][status] : null;
+
+// blurb 名义上是「一句话」，实际难免有人往里写一整篇。
+// 换行必须保留（敲了回车就该断行），但整篇铺开会把片单撑成一条长溜，
+// 所以长的收进折叠里，预览第一行。
+const text = String(blurb ?? '');
+const lines = text.split('\n');
+const isLong = text.length > 140 || lines.filter((l) => l.trim()).length > 4;
+const peek = lines.find((l) => l.trim()) ?? '';
 const when = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
 ---
 <article class:list={['item', !cover && 'item-bare']}>
@@ -47,7 +55,17 @@ const when = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' }
         </>
       )}
     </p>
-    <p class="blurb">{blurb}</p>
+    {isLong ? (
+      <details class="blurb-fold">
+        <summary>
+          <span class="peek">{peek.length > 56 ? peek.slice(0, 56) + '…' : peek}</span>
+          <span class="fold-hint"></span>
+        </summary>
+        <p class="blurb">{text}</p>
+      </details>
+    ) : (
+      <p class="blurb">{text}</p>
+    )}
     {essayHref && <a class="more" href={essayHref}>写了点感想 →</a>}
   </div>
 </article>
@@ -84,7 +102,20 @@ const when = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' }
     background: var(--border);
   }
   .pip.on { background: var(--accent); }
-  .blurb { margin: 0; font-size: 14px; line-height: 1.7; }
+  /* 保留换行：写的时候敲了回车，页面上就该断行。
+     不加这条的话浏览器把换行折成空格，一首诗会变成一整段。 */
+  .blurb { margin: 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .blurb-fold summary {
+    cursor: pointer; font-size: 14px; line-height: 1.7;
+    color: var(--muted); list-style: none; display: flex; gap: 6px;
+    align-items: baseline; flex-wrap: wrap;
+  }
+  .blurb-fold summary::-webkit-details-marker { display: none; }
+  .blurb-fold .fold-hint { color: var(--accent); font-size: 13px; white-space: nowrap; }
+  .blurb-fold .fold-hint::after { content: '展开'; }
+  .blurb-fold[open] .fold-hint::after { content: '收起'; }
+  .blurb-fold[open] .peek { display: none; }
+  .blurb-fold[open] summary { margin-bottom: 6px; }
   .more {
     display: inline-block; margin-top: 8px; font-size: 13px;
     color: var(--accent); text-decoration: none;
