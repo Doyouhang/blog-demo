@@ -296,7 +296,13 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET') {
       if (url.pathname === '/' || url.pathname === '/index.html') {
         const html = await readFile(path.join(here, 'index.html'));
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        // 不给缓存。这个页面是每次请求现读的，改完刷新就该生效；
+        // 浏览器要是缓存住旧页面，就会拿旧客户端去读新服务端的返回，
+        // 症状是点开条目一片空白 —— 而且完全看不出是缓存的锅。
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store, must-revalidate',
+        });
         return res.end(html);
       }
       if (url.pathname.startsWith('/media/')) {
