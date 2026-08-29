@@ -30,6 +30,7 @@ const IMAGE_HOSTS = [
   /^y\.gtimg\.cn$/,
   /^y\.qq\.com$/,
   /^p\d*\.music\.126\.net$/,
+  /^p\d*\.pipi\.cn$/,
 ];
 
 export function isAllowedImageUrl(raw) {
@@ -53,6 +54,7 @@ export function bigImageUrl(url) {
   if (/doubanio\.com/.test(u)) {
     return u
       .replace('/view/subject/s/', '/view/subject/l/')
+      .replace('/view/subject/m/', '/view/subject/l/')
       .replace('s_ratio_poster', 'l_ratio_poster')
       .replace('/spic/', '/lpic/');
   }
@@ -100,6 +102,42 @@ export function fromDoubanMovie(list) {
     }));
 }
 
+/**
+ * 豆瓣通用 search_suggest。一个接口同时出书、影、音，靠结果 url 的 hostname 分类。
+ *
+ * 为什么要它：movie 和 music 两个子域各自的 subject_suggest 都已经死了 ——
+ * 不是报错，是稳定返回空数组（HTTP 200，body 就俩字符 []），
+ * 从日志上完全看不出坏了。这个通用入口目前还活着，而且数据是全的。
+ */
+const DOUBAN_HOST = { book: 'book.douban.com', movie: 'movie.douban.com', song: 'music.douban.com' };
+
+export function fromDoubanSuggest(body, kind) {
+  const want = DOUBAN_HOST[kind];
+  return (body?.cards ?? [])
+    .filter((c) => c?.title && c?.cover_url)
+    .filter((c) => { try { return new URL(c.url).hostname === want; } catch { return false; } })
+    .map((c) => ({
+      source: '豆瓣',
+      title: String(c.title),
+      subtitle: String(c.abstract ?? ''),
+      thumb: toHttps(c.cover_url),
+      full: bigImageUrl(c.cover_url),
+    }));
+}
+
+/** 猫眼：影视的第二道保险，字段比豆瓣还全（导演、年份） */
+export function fromMaoyan(body) {
+  return (body?.movies?.list ?? [])
+    .filter((m) => m?.nm && m?.img)
+    .map((m) => ({
+      source: '猫眼',
+      title: String(m.nm),
+      subtitle: [m.dir, m.rt?.slice(0, 4)].filter(Boolean).join(' · '),
+      thumb: toHttps(m.img),
+      full: toHttps(m.img),   // 猫眼给的就是大图，不用换尺寸
+    }));
+}
+
 /** QQ 音乐 smartbox：itemlist 里有 mid / name / singer / pic */
 export function fromQQ(body) {
   const list = body?.data?.album?.itemlist ?? [];
@@ -143,20 +181,33 @@ export function fromNetease(body) {
 
 // ——— 每个源一个查询器。任何一个抛错都只丢掉自己那份结果 ———
 
+// 豆瓣的通用入口，一个接口服务三类
+const doubanSuggest = (kind) => ['豆瓣', async (q) =>
+  fromDoubanSuggest(
+    await fetchJson(`https://www.douban.com/j/search_suggest?q=${encodeURIComponent(q)}`,
+      { Referer: 'https://www.douban.com/' }),
+    kind)];
+
+// 每一类都配了不止一个源。这不是过度设计 —— 上线当天就撞上了：
+// 豆瓣 movie 子域的 subject_suggest 从有结果变成恒返回空数组，
+// 而它当时是影视唯一的源，于是影视一张图都搜不出来。
 const QUERIES = {
   book: [
+    doubanSuggest('book'),
     ['豆瓣图书', async (q) =>
       fromDoubanBook(await fetchJson(
         `https://book.douban.com/j/subject_suggest?q=${encodeURIComponent(q)}`,
         { Referer: 'https://book.douban.com/' }))],
   ],
   movie: [
-    ['豆瓣电影', async (q) =>
-      fromDoubanMovie(await fetchJson(
-        `https://movie.douban.com/j/subject_suggest?q=${encodeURIComponent(q)}`,
-        { Referer: 'https://movie.douban.com/' }))],
+    doubanSuggest('movie'),
+    ['猫眼', async (q) =>
+      fromMaoyan(await fetchJson(
+        `https://m.maoyan.com/ajax/search?kw=${encodeURIComponent(q)}&cityId=1&stype=-1`,
+        { Referer: 'https://m.maoyan.com/' }))],
   ],
   song: [
+    doubanSuggest('song'),
     ['QQ音乐', async (q) =>
       fromQQ(await fetchJson(
         `https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?key=${encodeURIComponent(q)}&format=json`,
@@ -188,7 +239,16 @@ export async function searchCovers(kind, q) {
     // 一家挂了只记下来，不影响别家 —— 这些都是非公开接口，指望不上它们一直在
     else failed.push({ source: name, error: s.reason?.message ?? String(s.reason) });
   });
-  return { results: results.filter((r) => isAllowedImageUrl(r.full)), failed };
+  // 多个源撞上同一张图是常事（豆瓣通用入口和图书专用入口就会重叠）。
+  // 按最终图片地址去重，但**留信息更全的那条**：通用入口的 abstract 是空的，
+  // 先到先得的话，「万历十五年」会出五条同名结果，一条作者年份都没有，根本没法选。
+  const byImage = new Map();
+  for (const r of results) {
+    if (!isAllowedImageUrl(r.full)) continue;
+    const prev = byImage.get(r.full);
+    if (!prev || (!prev.subtitle && r.subtitle)) byImage.set(r.full, r);
+  }
+  return { results: [...byImage.values()], failed };
 }
 
 /** 下载选中的封面。只认白名单主机，只收图片，大小设上限。 */

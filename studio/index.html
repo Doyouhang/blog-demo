@@ -97,8 +97,7 @@
                background: none; color: var(--muted); cursor: pointer; font-size: 11px; }
   .cover-box { display: flex; gap: 12px; align-items: flex-start; }
   .cover-box img { width: 90px; border-radius: 8px; border: 1px solid var(--border); display: block; }
-  .cover-find { margin-top: 8px; display: flex; gap: 6px; }
-  .cover-find input { flex: 1; min-width: 0; }
+  .cover-find { margin-top: 8px; }
   .cover-hits {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
     gap: 8px; margin-top: 10px;
@@ -285,8 +284,7 @@ function renderForm() {
         <div style="flex:1">
           <div class="drop" id="drop-cover" role="button" tabindex="0" aria-label="选择或拖入封面">拖一张封面进来，或点击/按回车选择</div>
           <div class="cover-find">
-            <input type="text" id="cover-q" placeholder="按名字搜封面" value="${escapeHtml(cur.front.title ?? '')}" />
-            <button type="button" id="cover-go">搜封面</button>
+            <button type="button" id="cover-go">按标题搜封面</button>
           </div>
           <div class="cover-hits" id="cover-hits"></div>
         </div>
@@ -321,10 +319,8 @@ function renderForm() {
   if (t.photos) { renderShots(); wireDrop('#drop-photos', true); }
   if (t.cover) {
     wireDrop('#drop-cover', false);
-    const go = $('#cover-go'), q = $('#cover-q');
+    const go = $('#cover-go');
     if (go) go.onclick = findCovers;
-    // 回车即搜；这个输入框在表单里，不拦的话会顺带触发别的默认行为
-    if (q) q.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); findCovers(); } };
   }
 }
 
@@ -410,14 +406,15 @@ async function findCovers() {
   const box = $('#cover-hits');
   if (!box) return;
   const kind = String(cur.front.kind ?? '');
-  const q = ($('#cover-q')?.value ?? '').trim();
-  if (!q) { box.innerHTML = '<p class="tip">先填个名字。</p>'; return; }
+  // 直接用标题。上面刚填过一遍，再让人输一次是白费事
+  const q = String(cur.front.title ?? '').trim();
+  if (!q) { box.innerHTML = '<p class="tip">先把上面的标题填了，再来搜封面。</p>'; return; }
   box.innerHTML = '<p class="tip">搜索中…</p>';
   try {
     const r = await api(`/api/cover/search?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q)}`);
     const dead = (r.failed ?? []).map((f) => f.source).join('、');
     if (!r.results.length) {
-      box.innerHTML = `<p class="tip">没搜到${dead ? `（${escapeHtml(dead)} 这次没响应）` : ''}。换个说法试试，或者直接拖一张图进来。</p>`;
+      box.innerHTML = `<p class="tip">没搜到${dead ? `（${escapeHtml(dead)} 这次没响应）` : ''}。改改上面的标题再试，或者直接拖一张图进来。</p>`;
       return;
     }
     box.innerHTML =

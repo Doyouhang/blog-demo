@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isAllowedImageUrl, toHttps, bigImageUrl,
-  fromDoubanBook, fromDoubanMovie, fromQQ, fromItunes, fromNetease,
+  fromDoubanBook, fromDoubanMovie, fromDoubanSuggest, fromMaoyan, fromQQ, fromItunes, fromNetease,
   searchCovers, fetchCoverImage,
 } from '../studio/covers.mjs';
 
@@ -178,5 +178,108 @@ test('下载：返回的不是图片要拒，太大也要拒', async () => {
 
     globalThis.fetch = async () => new Response(Buffer.alloc(0), { headers: { 'content-type': 'image/jpeg' } });
     await assert.rejects(() => fetchCoverImage(url), /空文件/);
+  } finally { globalThis.fetch = real; }
+});
+
+test('豆瓣通用 suggest：按 hostname 分类，别把电影混进书里', () => {
+  // 这个接口一次返回书影音三类，全靠结果 url 的 hostname 区分
+  const body = { cards: [
+    { title: '让子弹飞', url: 'https://movie.douban.com/subject/3742360/',
+      cover_url: 'https://img3.doubanio.com/view/photo/s_ratio_poster/public/p1.jpg' },
+    { title: '万历十五年', url: 'https://book.douban.com/subject/1041482/',
+      cover_url: 'https://img9.doubanio.com/view/subject/m/public/s2.jpg' },
+    { title: '范特西', url: 'https://music.douban.com/subject/1401843/',
+      cover_url: 'https://img1.doubanio.com/view/subject/s/public/s3.jpg' },
+  ] };
+  assert.deepEqual(fromDoubanSuggest(body, 'movie').map((x) => x.title), ['让子弹飞']);
+  assert.deepEqual(fromDoubanSuggest(body, 'book').map((x) => x.title), ['万历十五年']);
+  assert.deepEqual(fromDoubanSuggest(body, 'song').map((x) => x.title), ['范特西']);
+  // 中图尺寸 /m/ 也要能换成大图
+  assert.ok(fromDoubanSuggest(body, 'book')[0].full.includes('/view/subject/l/'));
+});
+
+test('豆瓣通用 suggest：url 坏掉的条目直接丢掉，不能炸', () => {
+  const body = { cards: [
+    { title: '没有 url', cover_url: 'https://img9.doubanio.com/view/subject/s/public/a.jpg' },
+    { title: 'url 是垃圾', url: '不是个网址', cover_url: 'https://img9.doubanio.com/view/subject/s/public/b.jpg' },
+    { title: '没有封面', url: 'https://book.douban.com/subject/1/' },
+  ] };
+  assert.deepEqual(fromDoubanSuggest(body, 'book'), []);
+  assert.deepEqual(fromDoubanSuggest({}, 'book'), []);
+  assert.deepEqual(fromDoubanSuggest(null, 'movie'), []);
+});
+
+test('猫眼：影视的第二道保险', () => {
+  const out = fromMaoyan({ movies: { list: [
+    { nm: '让子弹飞', dir: '姜文', rt: '2010-12-16',
+      img: 'https://p0.pipi.cn/mmdb/abc.jpg?imageMogr2/thumbnail/2500x2500%3E' },
+    { nm: '没有海报的' },
+  ] } });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].subtitle, '姜文 · 2010');
+  assert.equal(out[0].source, '猫眼');
+  assert.equal(isAllowedImageUrl(out[0].full), true, '猫眼的图床要在白名单里');
+});
+
+test('源返回 200 但恒空时，另一个源要顶上', async () => {
+  // 这是上线当天真实发生的：豆瓣 movie 子域的 subject_suggest 从有结果变成
+  // 稳定返回 []（HTTP 200，body 就俩字符），不报错、不超时，日志上完全看不出坏了。
+  // 当时影视只有这一个源，于是一张图都搜不出来。
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('search_suggest')) {
+      return new Response(JSON.stringify({ cards: [] }), { headers: { 'content-type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({ movies: { list: [
+      { nm: '让子弹飞', dir: '姜文', rt: '2010-12-16', img: 'https://p0.pipi.cn/mmdb/abc.jpg' },
+    ] } }), { headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const { results, failed } = await searchCovers('movie', '让子弹飞');
+    assert.equal(failed.length, 0, '返回空不算失败，它没报错');
+    assert.equal(results.length, 1, '猫眼那条要顶上');
+    assert.equal(results[0].source, '猫眼');
+  } finally { globalThis.fetch = real; }
+});
+
+test('去重时要留信息更全的那条', async () => {
+  // 豆瓣通用入口的 abstract 是空的，专用入口才有作者和年份。
+  // 先到先得的话，搜「万历十五年」会出一堆同名结果、一条副标题都没有，没法选。
+  const same = 'https://img9.doubanio.com/view/subject/l/public/s1800355.jpg';
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) =>
+    String(url).includes('search_suggest')
+      ? new Response(JSON.stringify({ cards: [
+          { title: '万历十五年', url: 'https://book.douban.com/subject/1/',
+            cover_url: 'https://img9.doubanio.com/view/subject/s/public/s1800355.jpg', abstract: '' },
+        ] }), { headers: { 'content-type': 'application/json' } })
+      : new Response(JSON.stringify([
+          { title: '万历十五年', pic: 'https://img9.doubanio.com/view/subject/s/public/s1800355.jpg',
+            author_name: '[美] 黄仁宇', year: '1997' },
+        ]), { headers: { 'content-type': 'application/json' } });
+  try {
+    const { results } = await searchCovers('book', '万历十五年');
+    assert.equal(results.length, 1);
+    assert.equal(results[0].subtitle, '[美] 黄仁宇 · 1997', '要留下带作者年份的那条');
+    assert.equal(results[0].full, same);
+  } finally { globalThis.fetch = real; }
+});
+
+test('多个源撞上同一张图要去重', async () => {
+  // 豆瓣通用入口和图书专用入口经常返回同一本书的同一张封面
+  const same = 'https://img9.doubanio.com/view/subject/s/public/s1800355.jpg';
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) =>
+    String(url).includes('search_suggest')
+      ? new Response(JSON.stringify({ cards: [
+          { title: '万历十五年', url: 'https://book.douban.com/subject/1/', cover_url: same },
+        ] }), { headers: { 'content-type': 'application/json' } })
+      : new Response(JSON.stringify([
+          { title: '万历十五年', pic: same, author_name: '黄仁宇' },
+        ]), { headers: { 'content-type': 'application/json' } });
+  try {
+    const { results } = await searchCovers('book', '万历十五年');
+    assert.equal(results.length, 1, '同一张图只该出现一次');
   } finally { globalThis.fetch = real; }
 });
