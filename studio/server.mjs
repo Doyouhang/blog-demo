@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import exifr from 'exifr';
 import { TYPES } from './schema.mjs';
+import { searchCovers, fetchCoverImage, isAllowedImageUrl, KINDS } from './covers.mjs';
 import {
   slugify, uniqueSlug, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
   parseExifOffset, sniffIsoBmff, parseFront, parsePhotos,
@@ -181,6 +182,40 @@ async function gitStatus() {
   return { files, ahead };
 }
 
+// 存一张图进条目目录：算路径、认格式、压缩、落盘。
+// 手动上传和封面检索都走这里 —— 两条路进来的图必须经过同样的处理，
+// 否则一条压缩了另一条没有，或者一条挡了 HEIC 另一条没挡。
+async function saveImageInto(type, slug, name, body) {
+    const t = TYPES[type];
+  if (!t) throw new Error('未知类型：' + type);
+
+  let dir;
+  if (t.flat) {
+    dir = path.join(ROOT, t.dir);
+  } else {
+    const safe = safeSegment(slug);
+    if (!safe) throw new Error('slug 不合法：' + slug);
+    dir = path.join(ROOT, t.dir, safe);
+  }
+  // 先认格式，再动文件系统 —— 否则一张传不了的图会留下一个空目录。
+  // sharp 对 HEIC 抛的是编解码插件层面的错，原样透给前端
+  // 等于让人对着一句天书猜自己该干嘛。
+  const bmff = sniffIsoBmff(body);
+  if (bmff) {
+    throw new Error(
+      `这张是 ${bmff} 格式，当前环境解不了。` +
+      '手机上关掉相机设置里的「高效率格式 / HEIF」改存 JPG，或者先把这张转成 JPG 再传。'
+    );
+  }
+
+  assertInside(dir, t.dir);
+  await mkdir(dir, { recursive: true });
+  const base = slugify(name.replace(/\.[^.]+$/, '')) + '-' + Date.now().toString(36);
+  const dest = path.join(dir, base + '.jpg');
+  const info = await processImage(body, dest);
+  return { ok: true, src: './' + path.basename(dest), before: body.length, ...info };
+}
+
 // ——— 路由 ———
 
 const routes = {
@@ -218,38 +253,29 @@ const routes = {
   },
 
   'POST /api/upload': async (body, url) => {
-    const type = url.searchParams.get('type');
-    const slug = url.searchParams.get('slug');
-    const name = url.searchParams.get('name') ?? 'photo.jpg';
-    const t = TYPES[type];
-    if (!t) throw new Error('未知类型：' + type);
-
-    let dir;
-    if (t.flat) {
-      dir = path.join(ROOT, t.dir);
-    } else {
-      const safe = safeSegment(slug);
-      if (!safe) throw new Error('slug 不合法：' + slug);
-      dir = path.join(ROOT, t.dir, safe);
-    }
-    // 先认格式，再动文件系统 —— 否则一张传不了的图会留下一个空目录。
-    // sharp 对 HEIC 抛的是编解码插件层面的错，原样透给前端
-    // 等于让人对着一句天书猜自己该干嘛。
-    const bmff = sniffIsoBmff(body);
-    if (bmff) {
-      throw new Error(
-        `这张是 ${bmff} 格式，当前环境解不了。` +
-        '手机上关掉相机设置里的「高效率格式 / HEIF」改存 JPG，或者先把这张转成 JPG 再传。'
-      );
-    }
-
-    assertInside(dir, t.dir);
-    await mkdir(dir, { recursive: true });
-    const base = slugify(name.replace(/\.[^.]+$/, '')) + '-' + Date.now().toString(36);
-    const dest = path.join(dir, base + '.jpg');
-    const info = await processImage(body, dest);
-    return { ok: true, src: './' + path.basename(dest), before: body.length, ...info };
+    return saveImageInto(
+      url.searchParams.get('type'),
+      url.searchParams.get('slug'),
+      url.searchParams.get('name') ?? 'photo.jpg',
+      body
+    );
   },
+
+  // 封面检索：输入名字搜候选图。书走豆瓣图书、影视走豆瓣电影，
+  // 音乐一次打 QQ / iTunes / 网易云三家 —— 它们的库互相补不齐。
+  'GET /api/cover/search': async (_body, url) => {
+    const kind = url.searchParams.get('kind') ?? '';
+    if (!KINDS.includes(kind)) throw new Error('不支持检索封面的类型：' + kind);
+    return { ok: true, ...(await searchCovers(kind, url.searchParams.get('q') ?? '')) };
+  },
+
+  // 选中一张：取大图 → 走和手动上传同一条处理链（压缩、存进条目目录）
+  'POST /api/cover/pick': async (body, _url) => {
+    const { type, slug, url: imageUrl, name } = JSON.parse(body);
+    const { buf } = await fetchCoverImage(imageUrl);
+    return saveImageInto(type, slug, (name || 'cover') + '.jpg', buf);
+  },
+
 
   'POST /api/commit': async (body) => {
     const { message } = JSON.parse(body);
@@ -294,6 +320,20 @@ const server = createServer(async (req, res) => {
     }
     // 静态：编辑器页面本身，以及已上传图片的预览
     if (req.method === 'GET') {
+      // 候选封面的缩略图代理。豆瓣的图有防盗链 —— 不带 Referer 直接返回 418，
+      // 而跨站 Referer 是浏览器伪造不了的，只能由服务端取回来转一手。
+      // u 是外部传进来的 URL，不设白名单的话这就是个 SSRF 洞：
+      // 能拿它去请求 127.0.0.1 或云厂商的元数据端点，而那是浏览器够不到的地方。
+      if (url.pathname === '/api/cover/thumb') {
+        const u = url.searchParams.get('u') ?? '';
+        if (!isAllowedImageUrl(u)) {
+          res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+          return res.end('图片地址不在允许的来源里');
+        }
+        const { buf, type } = await fetchCoverImage(u, 4 * 1024 * 1024);
+        res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
+        return res.end(buf);
+      }
       if (url.pathname === '/' || url.pathname === '/index.html') {
         const html = await readFile(path.join(here, 'index.html'));
         // 不给缓存。这个页面是每次请求现读的，改完刷新就该生效；

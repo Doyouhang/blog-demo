@@ -97,6 +97,26 @@
                background: none; color: var(--muted); cursor: pointer; font-size: 11px; }
   .cover-box { display: flex; gap: 12px; align-items: flex-start; }
   .cover-box img { width: 90px; border-radius: 8px; border: 1px solid var(--border); display: block; }
+  .cover-find { margin-top: 8px; display: flex; gap: 6px; }
+  .cover-find input { flex: 1; min-width: 0; }
+  .cover-hits {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px; margin-top: 10px;
+  }
+  .cover-hit {
+    display: flex; flex-direction: column; gap: 4px; padding: 6px; text-align: left;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+    color: inherit; font: inherit;
+  }
+  .cover-hit:hover, .cover-hit:focus-visible { border-color: var(--accent); }
+  .cover-hit img {
+    width: 100%; aspect-ratio: 3 / 4; object-fit: cover;
+    border-radius: 4px; background: var(--border); display: block;
+  }
+  .cover-hit b { font-size: 12px; line-height: 1.3; word-break: break-word; }
+  .cover-hit span { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .cover-hit i { font-size: 10px; color: var(--muted); font-style: normal; }
+  .cover-hits .tip { grid-column: 1 / -1; margin: 0; }
 
   .tip { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
          background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
@@ -262,7 +282,14 @@ function renderForm() {
     ${t.cover ? `<label class="f"><span>封面</span>
       <div class="cover-box">
         ${cur.cover ? `<img src="/media/${mediaDir}/${String(cur.cover).replace('./', '')}" alt="" />` : ''}
-        <div style="flex:1"><div class="drop" id="drop-cover" role="button" tabindex="0" aria-label="选择或拖入封面">拖一张封面进来，或点击/按回车选择</div></div>
+        <div style="flex:1">
+          <div class="drop" id="drop-cover" role="button" tabindex="0" aria-label="选择或拖入封面">拖一张封面进来，或点击/按回车选择</div>
+          <div class="cover-find">
+            <input type="text" id="cover-q" placeholder="按名字搜封面" value="${escapeHtml(cur.front.title ?? '')}" />
+            <button type="button" id="cover-go">搜封面</button>
+          </div>
+          <div class="cover-hits" id="cover-hits"></div>
+        </div>
       </div></label>` : ''}
     ${t.photos ? `<label class="f"><span>照片</span>
       <div class="drop" id="drop-photos" role="button" tabindex="0" aria-label="选择或拖入照片">把照片拖进来（可多张），也可以按回车选择。会自动压缩，并读出拍摄时间和相机参数。</div>
@@ -292,7 +319,13 @@ function renderForm() {
   };
 
   if (t.photos) { renderShots(); wireDrop('#drop-photos', true); }
-  if (t.cover) wireDrop('#drop-cover', false);
+  if (t.cover) {
+    wireDrop('#drop-cover', false);
+    const go = $('#cover-go'), q = $('#cover-q');
+    if (go) go.onclick = findCovers;
+    // 回车即搜；这个输入框在表单里，不拦的话会顺带触发别的默认行为
+    if (q) q.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); findCovers(); } };
+  }
 }
 
 function renderShots() {
@@ -366,6 +399,65 @@ async function upload(files, multi) {
     } catch (err) { log(`${f.name} 失败：${err.message}`, 'err'); }
   }
   renderForm();
+}
+
+// ——— 封面检索 ———
+//
+// 书走豆瓣图书、影视走豆瓣电影，音乐一次打 QQ / iTunes / 网易云三家。
+// 缩略图不能直接 <img src> 指向豆瓣 —— 那边有防盗链，不带 Referer 返回 418，
+// 而跨站 Referer 浏览器伪造不了，所以图也得从自家服务端转一手。
+async function findCovers() {
+  const box = $('#cover-hits');
+  if (!box) return;
+  const kind = String(cur.front.kind ?? '');
+  const q = ($('#cover-q')?.value ?? '').trim();
+  if (!q) { box.innerHTML = '<p class="tip">先填个名字。</p>'; return; }
+  box.innerHTML = '<p class="tip">搜索中…</p>';
+  try {
+    const r = await api(`/api/cover/search?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q)}`);
+    const dead = (r.failed ?? []).map((f) => f.source).join('、');
+    if (!r.results.length) {
+      box.innerHTML = `<p class="tip">没搜到${dead ? `（${escapeHtml(dead)} 这次没响应）` : ''}。换个说法试试，或者直接拖一张图进来。</p>`;
+      return;
+    }
+    box.innerHTML =
+      r.results.map((h, i) => `
+        <button type="button" class="cover-hit" data-i="${i}">
+          <img src="/api/cover/thumb?u=${encodeURIComponent(h.thumb)}" alt="" loading="lazy" />
+          <b>${escapeHtml(h.title)}</b>
+          <span>${escapeHtml(h.subtitle || '')}</span>
+          <i>${escapeHtml(h.source)}</i>
+        </button>`).join('') +
+      (dead ? `<p class="tip">${escapeHtml(dead)} 这次没响应，下面是其余来源的结果。</p>` : '');
+    box.querySelectorAll('.cover-hit').forEach((b) => {
+      b.onclick = () => pickCover(r.results[Number(b.dataset.i)]);
+    });
+  } catch (e) {
+    // 这些都是非公开接口，挂了是常态。挂了也只是搜不到，拖图那条路照旧
+    box.innerHTML = `<p class="tip">搜索失败：${escapeHtml(e.message)}。直接拖一张图进来也行。</p>`;
+  }
+}
+
+async function pickCover(hit) {
+  const box = $('#cover-hits');
+  if (box) box.innerHTML = '<p class="tip">正在下载并压缩…</p>';
+  try {
+    const r = await api('/api/cover/pick', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: cur.type, slug: cur.id ?? '', url: hit.full,
+        name: hit.title,
+      }),
+    });
+    cur.cover = r.src;
+    cur.front.cover = r.src;
+    log(`封面已存下：${r.src}（${Math.round(r.bytes / 1024)}KB，${r.width}×${r.height}）`, 'ok');
+    renderForm();
+  } catch (e) {
+    log('取封面失败：' + e.message, 'err');
+    if (box) box.innerHTML = `<p class="tip">${escapeHtml(e.message)}</p>`;
+  }
 }
 
 function validate(quiet) {
