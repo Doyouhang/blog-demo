@@ -10,8 +10,11 @@ interface MarketData {
   source: string;
   generatedAt: string;
   stale?: boolean;
-  /** 这次构建里哪半边是真抓到的。指数走 ulist、板块走 clist，分开抓也分开降级 */
+  /** 这次构建里哪半边是真抓到的。指数和板块分开抓、分开降级 */
   parts?: { indices: boolean; sectors: boolean };
+  /** 两半各自的数据时间。老数据没有这两个字段，回退到 generatedAt */
+  indicesAt?: string | null;
+  breadthAt?: string | null;
   /** 0–100，上涨板块占比。50 是多空平衡点 */
   temperature: number;
   mood: { key: string; label: string; note: string };
@@ -34,17 +37,24 @@ const hasData = hasBreadth || hasIndices;
 const parts = m.parts ?? { indices: hasIndices, sectors: hasBreadth };
 const missing = [!parts.indices && '指数', !parts.sectors && '板块'].filter(Boolean).join('与');
 
-const updated = new Date(m.generatedAt).toLocaleString('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  hour12: false,
-});
+const fmt = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '';
+const updated = fmt(m.generatedAt);
 
 // 提示语在这里拼好再塞进模板：写成多行 JSX 的话，中文标点之间会被
-// HTML 的换行折成一个空格，渲染出「板块数据， 这部分」这种断句
-const reused = (!parts.sectors && hasBreadth) || (!parts.indices && hasIndices);
+// HTML 的换行折成一个空格，渲染出「板块数据， 这部分」这种断句。
+//
+// 沿用旧数据时要报**那半边数据自己的时间**，不能报整卡的时间 ——
+// 线上出现过「沿用上一次的（03:36）」而 03:36 正是本次构建的时刻。
+const staleAt = (fresh: boolean, has: boolean, at?: string | null) =>
+  !fresh && has ? fmt(at ?? m.generatedAt) : '';
+const reusedAt = [
+  staleAt(parts.sectors, hasBreadth, m.breadthAt),
+  staleAt(parts.indices, hasIndices, m.indicesAt),
+].filter(Boolean)[0];
 const missingTip = missing
   ? `这次构建没能取到${missing}数据，` +
-    (reused ? `相关部分沿用上一次的（${updated}）。` : '这部分暂时空着。')
+    (reusedAt ? `相关部分还是 ${reusedAt} 那次的。` : '这部分暂时空着。')
   : '';
 
 const dirOf = (n: number) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');

@@ -147,6 +147,8 @@ if (!indices && !sectors && !previous) {
   write({
     source: 'sample',
     generatedAt: new Date().toISOString(),
+    indicesAt: null,
+    breadthAt: null,
     stale: true,
     parts: { indices: false, sectors: false },
     temperature: 50,
@@ -182,11 +184,20 @@ const stale = !indices || !sectors;
 // 哪半边是这次真抓到的。页面据此分区展示：板块没抓到不该把指数一起藏了。
 const parts = { indices: !!indices, sectors: !!sectors };
 
+// 两半各记各的时间。共用一个 generatedAt 是不够的：
+// 指数新、板块旧的时候，那一个时间戳无论取哪边都会让页面说错话 ——
+// 线上就出现过「板块沿用上一次的（时间）」而那个时间正是本次构建的时间。
+const nowIso = new Date().toISOString();
+const prevAt = (key) => previous?.[key] ?? previous?.generatedAt ?? null;
+const indicesAt = indices ? nowIso : prevAt('indicesAt');
+const breadthAt = sectors ? nowIso : prevAt('breadthAt');
+
 write({
   source: 'eastmoney',
-  // 有任何一半是新抓的，时间戳就是现在；具体哪部分是旧的由 parts 明说，
-  // 不靠一个含糊的旧时间戳去暗示
-  generatedAt: new Date().toISOString(),
+  // 整卡的时间取两边较新的那个；具体哪半边是什么时候的，看 indicesAt / breadthAt
+  generatedAt: [indicesAt, breadthAt].filter(Boolean).sort().pop() ?? nowIso,
+  indicesAt,
+  breadthAt,
   stale,
   parts,
   ...sectorPart,
