@@ -468,6 +468,15 @@ async function pickCover(hit) {
     cur.cover = r.src;
     cur.front.cover = r.src;
     log(`封面已存下：${r.src}（${Math.round(r.bytes / 1024)}KB，${r.width}×${r.height}）`, 'ok');
+
+    // 顺手把作者 / 歌手 / 导演填了。已经填过的不覆盖 —— 你可能有自己的写法
+    // （「[美] 黄仁宇」和「黄仁宇」），但会说一声搜到的是什么，想换自己改。
+    const who = String(hit.creator ?? '').trim();
+    if (who) {
+      const had = String(cur.front.creator ?? '').trim();
+      if (!had) { cur.front.creator = who; log(`顺便填上了：${who}`, 'ok'); }
+      else if (had !== who) log(`搜到的是「${who}」，你填的是「${had}」，没动它。`);
+    }
     renderForm();
   } catch (e) {
     log('取封面失败：' + e.message, 'err');

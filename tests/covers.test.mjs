@@ -283,3 +283,40 @@ test('多个源撞上同一张图要去重', async () => {
     assert.equal(results.length, 1, '同一张图只该出现一次');
   } finally { globalThis.fetch = real; }
 });
+
+test('各源都要单独给出 creator，好直接填进表单', () => {
+  assert.equal(fromDoubanBook([{ title: '置身事内', author_name: '兰小欢', year: '2021',
+    pic: 'https://img3.doubanio.com/view/subject/s/public/a.jpg' }])[0].creator, '兰小欢');
+  assert.equal(fromMaoyan({ movies: { list: [{ nm: '让子弹飞', dir: '姜文', rt: '2010-12-16',
+    img: 'https://p0.pipi.cn/mmdb/a.jpg' }] } })[0].creator, '姜文');
+  assert.equal(fromQQ({ data: { album: { itemlist: [{ name: '范特西', singer: '周杰伦',
+    pic: 'http://y.gtimg.cn/music/photo_new/T002R180x180M000a.jpg' }] } } })[0].creator, '周杰伦');
+  assert.equal(fromItunes({ results: [{ collectionName: '范特西', artistName: 'Jay Chou',
+    artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/x/100x100bb.jpg' }] })[0].creator, 'Jay Chou');
+  assert.equal(fromNetease({ result: { albums: [{ name: '后青春期的诗', artist: { name: '五月天' },
+    picUrl: 'https://p1.music.126.net/a==/1.jpg' }] } })[0].creator, '五月天');
+  // 豆瓣通用入口给不出作者，但也不能是 undefined —— 客户端要拿它去 trim
+  assert.equal(fromDoubanSuggest({ cards: [{ title: '让子弹飞', url: 'https://movie.douban.com/subject/1/',
+    cover_url: 'https://img3.doubanio.com/view/photo/s_ratio_poster/public/a.jpg' }] }, 'movie')[0].creator, '');
+});
+
+test('去重：带作者的那条要赢过只有副标题的', async () => {
+  // 豆瓣通用入口给不出作者。它先到就把猫眼那条挤掉的话，
+  // 「顺带填作者」这个功能等于白做。
+  const same = 'https://img3.doubanio.com/view/photo/l_ratio_poster/public/p1.jpg';
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) =>
+    String(url).includes('search_suggest')
+      ? new Response(JSON.stringify({ cards: [{ title: '让子弹飞', abstract: '2010',
+          url: 'https://movie.douban.com/subject/1/',
+          cover_url: 'https://img3.doubanio.com/view/photo/s_ratio_poster/public/p1.jpg' }] }),
+          { headers: { 'content-type': 'application/json' } })
+      : new Response(JSON.stringify({ movies: { list: [{ nm: '让子弹飞', dir: '姜文', rt: '2010-12-16',
+          img: same }] } }), { headers: { 'content-type': 'application/json' } });
+  try {
+    const { results } = await searchCovers('movie', '让子弹飞');
+    const withCreator = results.filter((r) => r.creator);
+    assert.ok(withCreator.length >= 1, '至少要留下一条带作者的');
+    assert.equal(withCreator[0].creator, '姜文');
+  } finally { globalThis.fetch = real; }
+});

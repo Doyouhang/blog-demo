@@ -82,6 +82,7 @@ export function fromDoubanBook(list) {
     .map((d) => ({
       source: '豆瓣',
       title: String(d.title),
+      creator: String(d.author_name ?? ''),
       subtitle: [d.author_name, d.year].filter(Boolean).join(' · '),
       thumb: toHttps(d.pic),
       full: bigImageUrl(d.pic),
@@ -95,6 +96,7 @@ export function fromDoubanMovie(list) {
     .map((d) => ({
       source: '豆瓣',
       title: String(d.title),
+      creator: '',   // 这个接口不给导演
       subtitle: [d.year, d.episode ? '剧集' : null, d.sub_title !== d.title ? d.sub_title : null]
         .filter(Boolean).join(' · '),
       thumb: toHttps(d.img),
@@ -119,6 +121,7 @@ export function fromDoubanSuggest(body, kind) {
     .map((c) => ({
       source: '豆瓣',
       title: String(c.title),
+      creator: '',   // 通用入口的 abstract 是空的，给不出作者
       subtitle: String(c.abstract ?? ''),
       thumb: toHttps(c.cover_url),
       full: bigImageUrl(c.cover_url),
@@ -132,6 +135,7 @@ export function fromMaoyan(body) {
     .map((m) => ({
       source: '猫眼',
       title: String(m.nm),
+      creator: String(m.dir ?? ''),
       subtitle: [m.dir, m.rt?.slice(0, 4)].filter(Boolean).join(' · '),
       thumb: toHttps(m.img),
       full: toHttps(m.img),   // 猫眼给的就是大图，不用换尺寸
@@ -146,6 +150,7 @@ export function fromQQ(body) {
     .map((d) => ({
       source: 'QQ音乐',
       title: String(d.name),
+      creator: String(d.singer ?? ''),
       subtitle: String(d.singer ?? ''),
       thumb: toHttps(d.pic),
       full: bigImageUrl(d.pic),
@@ -159,6 +164,7 @@ export function fromItunes(body) {
     .map((a) => ({
       source: 'iTunes',
       title: String(a.collectionName),
+      creator: String(a.artistName ?? ''),
       subtitle: [a.artistName, a.releaseDate?.slice(0, 4)].filter(Boolean).join(' · '),
       thumb: toHttps(a.artworkUrl100),
       full: bigImageUrl(a.artworkUrl100),
@@ -172,6 +178,7 @@ export function fromNetease(body) {
     .map((a) => ({
       source: '网易云',
       title: String(a.name),
+      creator: String(a.artist?.name ?? ''),
       subtitle: [a.artist?.name, a.publishTime ? new Date(a.publishTime).getFullYear() : null]
         .filter((x) => x && x !== 1970).join(' · '),
       thumb: toHttps(a.picUrl),
@@ -242,11 +249,14 @@ export async function searchCovers(kind, q) {
   // 多个源撞上同一张图是常事（豆瓣通用入口和图书专用入口就会重叠）。
   // 按最终图片地址去重，但**留信息更全的那条**：通用入口的 abstract 是空的，
   // 先到先得的话，「万历十五年」会出五条同名结果，一条作者年份都没有，根本没法选。
+  // 留信息更全的那条。作者排在副标题前面 —— 它能直接填进表单，
+  // 而豆瓣那个通用入口给不出作者，被它挤掉的话这个功能就白做了。
+  const score = (r) => (r.creator ? 2 : 0) + (r.subtitle ? 1 : 0);
   const byImage = new Map();
   for (const r of results) {
     if (!isAllowedImageUrl(r.full)) continue;
     const prev = byImage.get(r.full);
-    if (!prev || (!prev.subtitle && r.subtitle)) byImage.set(r.full, r);
+    if (!prev || score(r) > score(prev)) byImage.set(r.full, r);
   }
   return { results: [...byImage.values()], failed };
 }
