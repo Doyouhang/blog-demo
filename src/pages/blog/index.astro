@@ -3,10 +3,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import EssayCard from '../../components/EssayCard.astro';
 import TagCloud from '../../components/TagCloud.astro';
-import Icon from '../../components/Icon.astro';
 import { getCollection } from 'astro:content';
 
-const B = import.meta.env.BASE_URL;
 const posts = (await getCollection('essays'))
   .filter((p) => !p.data.draft)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
@@ -45,13 +43,6 @@ const archive = [...years.entries()].sort((a, b) => Number(b[0]) - Number(a[0]))
             </div>
           ))}
           <p class="side-foot">共 {posts.length} 篇</p>
-        </section>
-        <section class="side-box">
-          <h2>订阅</h2>
-          <div class="side-row">
-            <Icon name="rss" size={18} />
-            <a href={`${B}rss.xml`}>RSS 全文输出</a>
-          </div>
         </section>
       </aside>
     </div>

@@ -3,8 +3,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHeader from '../components/PageHeader.astro';
 import Icon from '../components/Icon.astro';
 
-const B = import.meta.env.BASE_URL;
-
 // 暂不公开邮箱：留空时下面那一行不渲染，页面不会有占位符残留。
 // 想放出来就填进来；介意被爬虫收走的话可以写成 "迩迩 [at] example [dot] com" 这种形式。
 const EMAIL = '';
@@ -40,10 +38,6 @@ const EMAIL = '';
           <div class="side-row">
             <Icon name="github" size={18} />
             <a href="https://github.com/Doyouhang">@Doyouhang</a>
-          </div>
-          <div class="side-row">
-            <Icon name="rss" size={18} />
-            <a href={`${B}rss.xml`}>RSS 订阅</a>
           </div>
         </section>
         <section class="side-box">

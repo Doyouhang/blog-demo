@@ -2,7 +2,7 @@
 //
 // 重要约定：这个脚本**不会让构建失败**。
 // 行情接口是第三方服务，从 GitHub 的海外 runner 上偶尔连不上；
-// 一个兴趣页的数据源抖动不该把整个站点（博客、关于页、RSS）一起带下线。
+// 一个兴趣页的数据源抖动不该把整个站点（博客、关于页）一起带下线。
 // 抓不到就沿用仓库里已有的数据，并打上 stale 标记让页面显示提示。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
