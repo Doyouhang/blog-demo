@@ -390,3 +390,46 @@ test('删除「此间」动态会清掉整个目录（照片在里面）', async
   assert.ok(!existsSync(dir), '整个目录该没了');
   assert.ok(r.data.removed.some((f) => f.endsWith('zz-photo.jpg')), '清单里要报上照片');
 });
+
+test('手动换封面也会把上一张删掉', async () => {
+  // 「按标题匹配信息」那条路一直传 replacing，本地拖一张进来的路原来不传，
+  // 于是每换一次就留一张几百 KB 的孤儿图 —— items 目录里真攒出过一张
+  const sharp = (await import('sharp')).default;
+  const jpg = (bg) => sharp({ create: { width: 60, height: 90, channels: 3, background: bg } }).jpeg().toBuffer();
+  const send = async (name, buf, replacing) => {
+    const q = new URLSearchParams({ type: 'items', slug: 'zz-cover-swap', name });
+    if (replacing) q.set('replacing', replacing);
+    const r = await fetch(`${B}/api/upload?${q}`, {
+      method: 'POST',
+      headers: { origin: B, 'content-type': 'application/octet-stream' },
+      body: buf,
+    });
+    return r.json();
+  };
+  const abs = (src) => path.join(ROOT, 'src/content/items', String(src).replace('./', ''));
+
+  const first = await send('zz-swap-a.jpg', await jpg('#a11'));
+  zz.push(abs(first.src));
+  const second = await send('zz-swap-b.jpg', await jpg('#1a1'), first.src);
+  zz.push(abs(second.src));
+
+  assert.ok(existsSync(abs(second.src)), '新封面该落盘');
+  assert.ok(!existsSync(abs(first.src)), '旧封面该跟着一起删掉');
+});
+
+test('加照片不会删掉已有的照片', async () => {
+  // 上一条那个 replacing 只该给封面用。照片是往上加的，
+  // 要是客户端顺手也传了，加第二张就会把第一张删掉
+  const sharp = (await import('sharp')).default;
+  const jpg = await sharp({ create: { width: 60, height: 40, channels: 3, background: '#357' } }).jpeg().toBuffer();
+  const send = (name) => fetch(
+    `${B}/api/upload?type=moments&slug=zz-photos&name=${name}`,
+    { method: 'POST', headers: { origin: B, 'content-type': 'application/octet-stream' }, body: jpg }
+  ).then((r) => r.json());
+  const a = await send('zz-p1.jpg');
+  const b = await send('zz-p2.jpg');
+  const dir = path.join(ROOT, 'src/content/moments/zz-photos');
+  const at = (src) => path.join(dir, String(src).replace('./', ''));
+  assert.ok(existsSync(at(a.src)) && existsSync(at(b.src)), '两张都该在');
+  rmSync(dir, { recursive: true, force: true });
+});

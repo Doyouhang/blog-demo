@@ -393,12 +393,16 @@ const routes = {
   },
 
   'POST /api/upload': async (body, url) => {
-    return saveImageInto(
-      url.searchParams.get('type'),
-      url.searchParams.get('slug'),
-      url.searchParams.get('name') ?? 'photo.jpg',
-      body
-    );
+    const type = url.searchParams.get('type');
+    const slug = url.searchParams.get('slug');
+    const saved = await saveImageInto(type, slug, url.searchParams.get('name') ?? 'photo.jpg', body);
+    // 手动换封面也要把上一张带走。原来只有「按标题匹配信息」那条路传 replacing，
+    // 从本地拖一张进来就留下一张孤儿图 —— items 目录里真攒出过一张。
+    // 两条路进来的图必须走同样的处理，否则一条清理了另一条没有。
+    // 照片是往上加的，不替换任何东西，客户端不会给它传 replacing。
+    const replacing = url.searchParams.get('replacing');
+    if (replacing && replacing !== saved.src) await removeSibling(type, slug, replacing);
+    return saved;
   },
 
   // 封面检索：输入名字搜候选图。书走豆瓣图书、影视走豆瓣电影，

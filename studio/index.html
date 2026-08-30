@@ -447,8 +447,11 @@ async function upload(files, multi) {
   for (const f of files) {
     try {
       log(`上传 ${f.name}…`);
-      const r = await api(`/api/upload?type=${cur.type}&slug=${encodeURIComponent(cur.id)}&name=${encodeURIComponent(f.name)}`,
-        { method: 'POST', body: f });
+      const q = new URLSearchParams({ type: cur.type, slug: cur.id, name: f.name });
+      // 换封面时告诉服务端旧的那张是谁，好一并删掉。
+      // 照片（multi）是往上加的，不替换任何东西，不能传
+      if (!multi && cur.cover) q.set('replacing', String(cur.cover));
+      const r = await api('/api/upload?' + q, { method: 'POST', body: f });
       const kb = (n) => Math.round(n / 1024) + 'KB';
       log(`${f.name} → ${kb(r.before)} 压到 ${kb(r.bytes)}`, 'ok');
       if (multi) {

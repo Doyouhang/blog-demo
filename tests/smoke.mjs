@@ -298,10 +298,34 @@ ok('搜得到文章', rAstro.length > 0, rAstro.length + ' 条');
 // 会稀释结果还抢排名。以前搜 Astro 第一条弹的是标签页。
 const indexPage = new RegExp(`/tags/|${PREFIX}/blog/$|${PREFIX}/interests/$|^${PREFIX}/$`);
 ok('结果里没有标签页/列表页', !rAstro.some((u) => indexPage.test(u)), rAstro[0] ?? '');
-ok('第一条是详情页', /\/blog\/[^/]+\/$/.test(rAstro[0] ?? ''), rAstro[0] ?? '');
+// 站上还有长文的时候才检查排序。脚手架自带的示例文章是要被删掉的，
+// 断言不该因为「他把示例删了」而变红
+const post = /\/blog\/[^/]+\/$/;
+if (rAstro.some((u) => post.test(u))) {
+  ok('第一条是详情页', post.test(rAstro[0] ?? ''), rAstro[0] ?? '');
+} else {
+  console.log('· 跳过「第一条是详情页」：搜 Astro 没有长文命中，站上大概没有相关长文了');
+}
 
-const rZh = await doSearch('周末');
-ok('中文能搜到', rZh.some((u) => u.includes('/blog/weekend/')), rZh[0] ?? '');
+// 中文分词是 Pagefind 的真实风险点（默认按空格切词，中文没有空格）。
+// 但查询词要从站上**现有**内容里取 —— 原来这条钉死在示例文章 weekend.md 上，
+// 他一删，这条就莫名其妙红了，而搜索本身好好的。
+await page.goto(BASE + '/sparks/', { waitUntil: 'networkidle' });
+const zhWord = await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.jot .body')) {
+    const m = (el.textContent ?? '').match(/[\u4e00-\u9fa5]{4,}/);
+    if (m) return m[0].slice(0, 4);
+  }
+  return null;
+});
+await page.goto(BASE + '/search/', { waitUntil: 'networkidle' });
+await page.waitForFunction(() => !document.getElementById('q')?.disabled, null, { timeout: 8000 });
+if (zhWord) {
+  const rZh = await doSearch(zhWord);
+  ok('中文能搜到', rZh.some((u) => u.includes('/sparks/')), `${zhWord} → ${rZh[0] ?? '无'}`);
+} else {
+  console.log('· 跳过「中文能搜到」：闪念页上没取到中文词');
+}
 
 // 注意：中文是按词切分的，搜一个长句会匹配到包含其中多数词的页面，那是预期行为。
 // 要测「无结果」分支得用真正不存在的字串。
