@@ -17,6 +17,7 @@ import { searchCovers, fetchCoverImage, isAllowedImageUrl, KINDS } from './cover
 import {
   slugify, uniqueSlug, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
   parseExifOffset, sniffIsoBmff, parseFront, parsePhotos,
+  TOPIC_BY_KIND, noteTitleFor, noteSlugFor,
 } from './lib.mjs';
 
 const run = promisify(execFile);
@@ -216,6 +217,33 @@ async function saveImageInto(type, slug, name, body) {
   return { ok: true, src: './' + path.basename(dest), before: body.length, ...info };
 }
 
+/**
+ * 收藏条目选了「长文」时，连带写出那篇长文。
+ *
+ * 字段全部从条目派生，不让人填两遍：一句话既是卡片摘要也是长文简介，
+ * topic 按 kind 映射（对不上的话影评会跑到读书页的侧栏去），
+ * 日期和草稿状态跟着条目走。
+ *
+ * 返回长文的 id，由调用方写进条目的 essay 字段 —— 关联只存在条目这一侧。
+ */
+async function saveNote(itemSlug, itemFront, note) {
+  const t = TYPES.essays;
+  const id = safeSegment(noteSlugFor(itemSlug, itemFront.essay));
+  if (!id) throw new Error('长文 id 派生不出来');
+  const file = path.join(ROOT, t.dir, id + '.md');
+  assertInside(file, t.dir);
+  await mkdir(path.dirname(file), { recursive: true });
+  const front = {
+    title: noteTitleFor(itemFront.kind, itemFront.title, note.title),
+    description: String(itemFront.blurb ?? '').trim(),
+    pubDate: itemFront.date ?? new Date().toISOString().slice(0, 10),
+    topic: TOPIC_BY_KIND[itemFront.kind] ?? 'blog',
+    draft: itemFront.draft === true || String(itemFront.draft) === 'true',
+  };
+  await writeFile(file, buildMarkdown(front, note.body), 'utf8');
+  return id;
+}
+
 // ——— 路由 ———
 
 const routes = {
@@ -226,7 +254,7 @@ const routes = {
   },
 
   'POST /api/save': async (body) => {
-    const { type, id, front, bodyText } = JSON.parse(body);
+    const { type, id, front, bodyText, note } = JSON.parse(body);
     const t = TYPES[type];
     if (!t) throw new Error('未知类型：' + type);
 
@@ -245,11 +273,19 @@ const routes = {
       slug = uniqueSlug(base, (s) => existsSync(fileFor(s)));
     }
 
+    // 先写长文再写条目：反过来的话，长文写失败会留下一个指向不存在文件的关联，
+    // 而 reference() 会让下一次构建直接报错。
+    let noteId = null;
+    if (note && String(note.body ?? '').trim()) {
+      noteId = await saveNote(slug, front, note);
+      front.essay = noteId;
+    }
+
     const file = fileFor(slug);
     assertInside(file, t.dir);
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, buildMarkdown(front, bodyText), 'utf8');
-    return { ok: true, id: slug, file: path.relative(ROOT, file) };
+    return { ok: true, id: slug, file: path.relative(ROOT, file), noteId };
   },
 
   'POST /api/upload': async (body, url) => {

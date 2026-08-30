@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   slugify, uniqueSlug, scalar, toYaml, buildMarkdown, peekTitle, exifLocalTime, safeSegment,
   parseExifOffset, sniffIsoBmff, unquote, parseFront, parsePhotos,
+  TOPIC_BY_KIND, noteTitleFor, noteSlugFor,
 } from '../studio/lib.mjs';
 
 test('scalar: 多行文本必须转义，不能产出裸换行', () => {
@@ -224,4 +225,34 @@ test('往返：手写的行内数组读进来再写出去，内容不丢', () =>
   const { front, body } = parseFront(md);
   const { front: back } = parseFront(buildMarkdown(front, body));
   assert.deepEqual(back.tags, ['随笔', '建站'], '过一轮编辑器不能丢标签');
+});
+
+test('长文归属跟着条目类型走', () => {
+  // 映射错了的话，写的影评会跑到读书页的侧栏里去 —— 页面照常渲染，只是挂错了地方
+  assert.equal(TOPIC_BY_KIND.movie, 'watching');
+  assert.equal(TOPIC_BY_KIND.book, 'reading');
+  assert.equal(TOPIC_BY_KIND.song, 'music');
+});
+
+test('长文标题：没填就派生，填了就用填的', () => {
+  assert.equal(noteTitleFor('movie', '奥德赛'), '《奥德赛》观后');
+  assert.equal(noteTitleFor('book', '万历十五年'), '《万历十五年》读后');
+  assert.equal(noteTitleFor('song', '范特西'), '《范特西》听后');
+  assert.equal(noteTitleFor('movie', '奥德赛', '关于回家这件事'), '关于回家这件事');
+  assert.equal(noteTitleFor('movie', '奥德赛', '   '), '《奥德赛》观后', '全是空格等于没填');
+});
+
+test('长文标题：条目没标题也不能派生出空标题', () => {
+  // 空标题会让 essays 的 Zod 校验在构建期报错，而错误信息指向的是那个文件，
+  // 不是这里 —— 排查起来会绕一圈
+  assert.equal(noteTitleFor('movie', ''), '《无题》观后');
+  assert.equal(noteTitleFor('movie', undefined), '《无题》观后');
+  assert.equal(noteTitleFor('什么类型', '某某'), '《某某》手记');
+});
+
+test('长文文件名：已经关联过的要沿用，不能每次都派生新的', () => {
+  // 不沿用的话，每保存一次就多出一篇孤儿长文，同一条内容散成好几份
+  assert.equal(noteSlugFor('ao-de-sai', null), 'ao-de-sai-note');
+  assert.equal(noteSlugFor('ao-de-sai', ''), 'ao-de-sai-note');
+  assert.equal(noteSlugFor('ao-de-sai', 'my-custom-essay'), 'my-custom-essay');
 });

@@ -218,6 +218,18 @@ function load(id) {
     photos: S.types[cur.type].photos ? (e.photos ?? []) : [],
     cover: front.cover ?? null,
   };
+  // 关联了长文的条目，打开就该是长文模式，正文从关联的那篇载进来 ——
+  // 否则一保存就会又派生出一篇新的，同一条内容散成两份。
+  if (S.types[cur.type].fields.some((f) => f.key === 'noteMode')) {
+    const linked = front.essay
+      ? (S.collections.essays ?? []).find((e) => e.id === front.essay)
+      : null;
+    cur.front.noteMode = linked ? 'essay' : 'blurb';
+    if (linked) {
+      cur.front.noteTitle = linked.front?.title ?? '';
+      cur.front.noteBody = linked.body ?? '';
+    }
+  }
   // datetime-local 不认 ISO 里的时区后缀，截到分钟
   for (const f of S.types[cur.type].fields) {
     if (f.type === 'datetime' && cur.front[f.key]) cur.front[f.key] = String(cur.front[f.key]).slice(0, 16);
@@ -305,7 +317,13 @@ function renderForm() {
     if (el.type === 'checkbox') cur.front[k] = el.checked;
     else if (el.dataset.tags) cur.front[k] = el.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
     else cur.front[k] = el.value;
-    if (k === 'kind') renderForm(); // 书才有「状态」字段
+    // 有别的字段的显示条件挂在它身上，就得重画一遍表单。
+    // 原来这里写死的是 k === 'kind'，加「这段文字」这个下拉时就漏了 ——
+    // 值改了、依赖它的字段却不出现。改成看 schema 自己说了算。
+    // 只认 select 和勾选框：文本框每敲一个字都重画的话，焦点会一直丢。
+    const drives = S.types[cur.type].fields.some(
+      (f) => f.onlyWhen && Object.keys(f.onlyWhen)[0] === k);
+    if (drives && (el.tagName === 'SELECT' || el.type === 'checkbox')) renderForm();
   };
   $('#form').onclick = (e) => {
     const b = e.target.closest('.rate button');
@@ -481,6 +499,8 @@ function buildFront() {
   const t = S.types[cur.type];
   const front = {};
   for (const f of t.fields) {
+    // transient 只影响表单长什么样，不是内容 —— 写进 md 就多了一处会不同步的状态
+    if (f.transient) continue;
     if (!shows(f)) continue;
     let v = cur.front[f.key];
     if (v === '' || v == null) continue;
@@ -502,12 +522,31 @@ function buildFront() {
 
 async function save({ silent } = {}) {
   if (!silent && !validate()) return;
+  const front = buildFront();
+  const hasNote = S.types[cur.type].fields.some((f) => f.key === 'noteMode');
+  const wantEssay = hasNote && cur.front.noteMode === 'essay';
+  const hadEssay = hasNote && !!front.essay;
+  // 切回短评：解除关联，但**不碰那个文件** —— 里面是写过的字，静默删掉太危险
+  if (hasNote && !wantEssay) delete front.essay;
+  // 长文模式下 essay 字段是隐藏的，buildFront 会跳过它。
+  // 不在这儿补回去的话，服务端拿不到旧 id，每保存一次就派生出一篇新的长文。
+  if (wantEssay && cur.front.essay) front.essay = cur.front.essay;
+
   const r = await api('/api/save', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: cur.type, id: cur.id, front: buildFront(), bodyText: cur.body }),
+    body: JSON.stringify({
+      type: cur.type, id: cur.id, front, bodyText: cur.body,
+      note: wantEssay ? { title: cur.front.noteTitle, body: cur.front.noteBody } : null,
+    }),
   });
   cur.id = r.id;
-  if (!silent) log('已写入 ' + r.file, 'ok');
+  // 记住派生出的长文 id，再保存一次就落回同一篇，不会越存越多
+  if (r.noteId) cur.front.essay = r.noteId;
+  if (!silent) {
+    log('已写入 ' + r.file, 'ok');
+    if (r.noteId) log('长文一并写好了：src/content/essays/' + r.noteId + '.md', 'ok');
+    else if (hadEssay && !wantEssay) log('已取消关联。那篇长文还在，要删去「长文」列表里删。');
+  }
   await refresh();
   return r;
 }

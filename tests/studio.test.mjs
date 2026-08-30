@@ -7,7 +7,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -192,4 +192,88 @@ test('已有条目能读回来再编辑，反复保存内容不走样', async ()
   assert.equal(r2.status, 200);
   assert.equal(r2.data.id, id, '编辑要落回同一个文件，不能派生出新条目');
   assert.equal(readFileSync(file, 'utf8'), afterFirst, '再保存一次内容不该有任何变化');
+});
+
+test('收藏选「长文」：条目和长文一起写出来，且互相对得上', async () => {
+  const front = {
+    kind: 'movie', title: '测试片', creator: '某导演', date: '2026-08-29',
+    blurb: '一句话摘要', draft: true,
+  };
+  const r = await post('/api/save', {
+    type: 'items', id: null, front, bodyText: '',
+    note: { title: '', body: '第一段\n\n第二段' },
+  });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const itemId = r.data.id, noteId = r.data.noteId;
+  assert.ok(noteId, '该派生出长文 id');
+
+  const itemFile = path.join(ROOT, 'src/content/items', itemId + '.md');
+  const noteFile = path.join(ROOT, 'src/content/essays', noteId + '.md');
+  try {
+    const item = readFileSync(itemFile, 'utf8');
+    const note = readFileSync(noteFile, 'utf8');
+    assert.match(item, new RegExp(`essay: ${noteId}`), '条目要指向那篇长文');
+    assert.match(note, /title: 《测试片》观后/, '标题没填就按条目派生');
+    assert.match(note, /topic: watching/, 'movie 的长文该挂在影视页下');
+    assert.match(note, /description: 一句话摘要/, '简介复用那句话，不用写两遍');
+    // scalar 会给纯日期加引号 —— 不加的话 YAML 会把它解析成日期对象
+    assert.match(note, /pubDate: "2026-08-29"/);
+    assert.match(note, /draft: true/, '草稿状态跟着条目走');
+    assert.ok(note.includes('第一段\n\n第二段'), '正文原样写进去');
+
+    // 再存一次：不能又派生出第二篇
+    const again = await post('/api/save', {
+      type: 'items', id: itemId, front: { ...front, essay: noteId }, bodyText: '',
+      note: { title: '', body: '改过的正文' },
+    });
+    assert.equal(again.data.noteId, noteId, '要落回同一篇，不能越存越多');
+    assert.match(readFileSync(noteFile, 'utf8'), /改过的正文/);
+    const essays = readdirSync(path.join(ROOT, 'src/content/essays'));
+    assert.equal(essays.filter((f) => f.startsWith(itemId)).length, 1, '只该有一篇');
+  } finally {
+    rmSync(itemFile, { force: true });
+    rmSync(noteFile, { force: true });
+  }
+});
+
+test('切回「短评」：解除关联，但长文文件不能被删掉', async () => {
+  // 里面是人写过的字。静默删掉是不可接受的 —— 取消关联和删除是两回事。
+  const front = {
+    kind: 'book', title: '测试书', creator: '某作者', date: '2026-08-29',
+    blurb: '摘要', draft: true,
+  };
+  const r1 = await post('/api/save', {
+    type: 'items', id: null, front, bodyText: '', note: { title: '', body: '正文在此' },
+  });
+  const itemId = r1.data.id, noteId = r1.data.noteId;
+  const itemFile = path.join(ROOT, 'src/content/items', itemId + '.md');
+  const noteFile = path.join(ROOT, 'src/content/essays', noteId + '.md');
+  try {
+    // 客户端切回短评时会把 essay 从 front 里删掉、note 传 null
+    const r2 = await post('/api/save', {
+      type: 'items', id: itemId, front: { ...front }, bodyText: '', note: null,
+    });
+    assert.equal(r2.status, 200);
+    assert.equal(r2.data.noteId, null);
+    assert.doesNotMatch(readFileSync(itemFile, 'utf8'), /^essay:/m, '关联要解除');
+    assert.equal(existsSync(noteFile), true, '长文文件必须还在');
+    assert.match(readFileSync(noteFile, 'utf8'), /正文在此/, '内容一个字都不能少');
+  } finally {
+    rmSync(itemFile, { force: true });
+    rmSync(noteFile, { force: true });
+  }
+});
+
+test('长文正文是空的就不写文件，也不留下悬空关联', async () => {
+  // 悬空关联会让下一次构建直接报错 —— reference() 是构建期校验的
+  const r = await post('/api/save', {
+    type: 'items', id: null,
+    front: { kind: 'song', title: '空正文测试', creator: 'x', date: '2026-08-29', blurb: 'y', draft: true },
+    bodyText: '', note: { title: '', body: '   ' },
+  });
+  const itemFile = path.join(ROOT, 'src/content/items', r.data.id + '.md');
+  try {
+    assert.equal(r.data.noteId, null);
+    assert.doesNotMatch(readFileSync(itemFile, 'utf8'), /^essay:/m);
+  } finally { rmSync(itemFile, { force: true }); }
 });

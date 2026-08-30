@@ -211,6 +211,32 @@ export function parsePhotos(raw) {
 }
 
 /**
+ * 收藏条目的 kind 决定长文挂在哪个兴趣页下。
+ * 对不上的话，写的影评会跑到读书页的侧栏里去。
+ */
+export const TOPIC_BY_KIND = { book: 'reading', movie: 'watching', song: 'music' };
+
+const NOTE_SUFFIX = { book: '读后', movie: '观后', song: '听后' };
+
+/** 长文标题：没填就按条目标题派生。空标题会让 essays 的 Zod 校验在构建期报错 */
+export function noteTitleFor(kind, itemTitle, given) {
+  const t = String(given ?? '').trim();
+  if (t) return t;
+  const name = String(itemTitle ?? '').trim() || '无题';
+  return `《${name}》${NOTE_SUFFIX[kind] ?? '手记'}`;
+}
+
+/**
+ * 长文的文件名：跟着条目走，加 -note 后缀。
+ * 已经关联过的沿用原来的 id —— 不然每保存一次就多出一篇孤儿长文。
+ */
+export function noteSlugFor(itemSlug, existingEssayId) {
+  const keep = String(existingEssayId ?? '').trim();
+  if (keep) return keep;
+  return `${slugify(itemSlug)}-note`;
+}
+
+/**
  * EXIF 的 OffsetTimeOriginal 形如 "+09:00" / "-05:00"，换算成分钟。
  * 手机基本都会写这个字段，相机常常不写 —— 不写的时候返回 null，
  * 由调用方回退到本机时区（在家门口拍的照片，这个回退是对的）。

@@ -36,8 +36,20 @@ export const TYPES = {
         options: [{ v: '', t: '（不填，按已完成算）' }, { v: 'doing', t: '在读 / 在看' },
                   { v: 'done', t: '读完 / 看完' }, { v: 'want', t: '想读 / 想看' }] },
       { key: 'rating', label: '评分', type: 'rating' },
-      { key: 'blurb', label: '一句话', type: 'textarea', required: true, rows: 2 },
-      { key: 'essay', label: '关联长文', type: 'ref', refTo: 'essays' },
+      // 这段文字是短评还是长文。**transient：只影响表单，不写进 md** ——
+      // 当前是哪种模式由「有没有关联长文」反推得出，多存一个字段就多一处会不同步的地方。
+      { key: 'noteMode', label: '这段文字', type: 'select', transient: true,
+        options: [{ v: 'blurb', t: '短评（写在卡片上）' },
+                  { v: 'essay', t: '长文（单独成篇，卡片上给链接）' }] },
+      { key: 'blurb', label: '一句话（卡片上显示）', type: 'textarea', required: true, rows: 2 },
+      { key: 'noteTitle', label: '长文标题', type: 'text', transient: true,
+        onlyWhen: { noteMode: 'essay' }, placeholder: '留空就用《标题》观后' },
+      { key: 'noteBody', label: '正文（Markdown）', type: 'textarea', transient: true,
+        onlyWhen: { noteMode: 'essay' }, rows: 14, required: true },
+      // 只在短评模式下露出来（用来手动挂一篇已经写好的长文）。
+      // 长文模式下这个字段由系统填，露出来让人手改必然打架。
+      { key: 'essay', label: '关联长文', type: 'ref', refTo: 'essays',
+        onlyWhen: { noteMode: 'blurb' } },
     ],
     cover: true,
   },
