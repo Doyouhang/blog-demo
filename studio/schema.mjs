@@ -18,6 +18,18 @@ export const TYPES = {
     ],
     photos: true,
   },
+  sparks: {
+    label: '闪念',
+    hint: '一句话、一个念头。没有标题，正文就是全部；撑得起标题的该去写长文。',
+    dir: 'src/content/sparks',
+    flat: true,
+    bodyLabel: '想到了什么',
+    bodyRequired: true,
+    fields: [
+      { key: 'date', label: '时间', type: 'datetime', required: true },
+      { key: 'tags', label: '标签', type: 'tags' },
+    ],
+  },
   items: {
     label: '收藏',
     hint: '听过的歌、读过的书、看过的片。想细说的另写长文，在这里关联过去。',

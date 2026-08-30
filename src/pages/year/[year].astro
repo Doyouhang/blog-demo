@@ -3,33 +3,39 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import Icon from '../../components/Icon.astro';
 import { getCollection } from 'astro:content';
+import { cstYear, cstMonth } from '../../utils/cst';
 
 // 有内容的年份才生成页面 —— 空年份的回顾页只会是一排零，没有意义
 export async function getStaticPaths() {
-  const [essays, items, moments] = await Promise.all([
+  const [essays, items, moments, sparks] = await Promise.all([
     getCollection('essays', ({ data }) => !data.draft),
     getCollection('items', ({ data }) => !data.draft),
     getCollection('moments', ({ data }) => !data.draft),
+    getCollection('sparks', ({ data }) => !data.draft),
   ]);
 
+  // 年份一律按北京时间取：跑在 UTC 的 runner 上，一条 1 月 1 日 0 点的记录
+  // 用 getFullYear() 会掉进上一年
   const years = new Set<number>();
-  for (const e of essays) years.add(e.data.pubDate.getFullYear());
-  for (const i of items) years.add(i.data.date.getFullYear());
-  for (const m of moments) years.add(m.data.date.getFullYear());
+  for (const e of essays) years.add(cstYear(e.data.pubDate));
+  for (const i of items) years.add(cstYear(i.data.date));
+  for (const m of moments) years.add(cstYear(m.data.date));
+  for (const s of sparks) years.add(cstYear(s.data.date));
 
   return [...years].map((year) => ({
     params: { year: String(year) },
     props: {
       year,
-      essays: essays.filter((e) => e.data.pubDate.getFullYear() === year),
-      items: items.filter((i) => i.data.date.getFullYear() === year),
-      moments: moments.filter((m) => m.data.date.getFullYear() === year),
+      essays: essays.filter((e) => cstYear(e.data.pubDate) === year),
+      items: items.filter((i) => cstYear(i.data.date) === year),
+      moments: moments.filter((m) => cstYear(m.data.date) === year),
+      sparks: sparks.filter((s) => cstYear(s.data.date) === year),
       allYears: [...years].sort((a, b) => b - a),
     },
   }));
 }
 
-const { year, essays, items, moments, allYears } = Astro.props;
+const { year, essays, items, moments, sparks, allYears } = Astro.props;
 const B = import.meta.env.BASE_URL;
 
 const books = items.filter((i) => i.data.kind === 'book' && (i.data.status ?? 'done') === 'done');
@@ -39,12 +45,13 @@ const places = [...new Set(moments.map((m) => m.data.place).filter((p): p is str
 
 // 每月活跃度：把三种内容合到一起算，看得出哪几个月在认真记录
 const months = Array.from({ length: 12 }, (_, i) => {
-  const inMonth = (d: Date) => d.getMonth() === i;
+  const inMonth = (d: Date) => cstMonth(d) === i + 1;
   return {
     m: i + 1,
     n: essays.filter((e) => inMonth(e.data.pubDate)).length +
        items.filter((x) => inMonth(x.data.date)).length +
-       moments.filter((x) => inMonth(x.data.date)).length,
+       moments.filter((x) => inMonth(x.data.date)).length +
+       sparks.filter((x) => inMonth(x.data.date)).length,
   };
 });
 const peak = Math.max(...months.map((x) => x.n), 1);
@@ -58,6 +65,7 @@ const stats = [
   { icon: 'camera' as const, n: photos, unit: '张', label: '拍的照片' },
   { icon: 'map' as const, n: places.length, unit: '个', label: '去过的地方' },
   { icon: 'code' as const, n: essays.length, unit: '篇', label: '写的文章' },
+  { icon: 'bulb' as const, n: sparks.length, unit: '条', label: '记下的闪念' },
 ];
 const total = stats.reduce((n, s) => n + s.n, 0);
 ---

@@ -41,6 +41,20 @@ const items = defineCollection({
     }),
 });
 
+/**
+ * 闪念：一句话、一个念头。**没有 title 也没有 description** —— 正文就是全部，
+ * 这是它和 essays 的分界线：撑得起标题的该写成长文，撑不起的落在这里。
+ */
+const sparks = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/sparks' }),
+  schema: z.object({
+    // 只写了日期没写时刻的存 T00:00:00+08:00，页面拿整点午夜当"没记时刻"的哨兵
+    date: z.coerce.date(),
+    tags: z.array(z.string()).default([]),
+    draft: z.boolean().default(false),
+  }),
+});
+
 /** 图文动态：摄影 + 旅行合并后的时间线。正文就是那一段话，不单独设字段。 */
 const moments = defineCollection({
   // 一条动态是一个目录（index.md + 同目录的图），删一条就是删一个目录，
@@ -77,4 +91,4 @@ const moments = defineCollection({
     }),
 });
 
-export const collections = { essays, items, moments };
+export const collections = { essays, items, moments, sparks };

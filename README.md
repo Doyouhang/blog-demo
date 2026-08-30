@@ -73,7 +73,7 @@ npm run fetch:all                 # 抓大盘 + 行情，正常会打印水温�
 SITE_BASE=/blog-demo/ npm run build
 ```
 
-`dist/` 下出现 `index.html`、`blog/`、`interests/`、`rss.xml` 就说明环境没问题。
+`dist/` 下出现 `index.html`、`blog/`、`interests/` 就说明环境没问题。
 
 注意 `fetch:all` 会改写 `src/data/stocks.json` 和 `src/data/market.json`。这两份是提交进仓库的
 「种子数据」—— 只是本地试跑的话，调试完记得还原：
@@ -212,6 +212,7 @@ export const OG_IMAGE = 'og.png';
 | 发文章、写观后感读后感 | `src/content/essays/*.md` |
 | 书架 / 片单 / 歌单的条目 | `src/content/items/*.md`（封面可在 studio 里搜） |
 | 「此间」的图文动态 | `src/content/moments/<条目>/` |
+| 「闪念」的碎片记录 | `src/content/sparks/*.md`（没有标题，正文就是全部） |
 | 关于页正文 | `src/pages/about.astro` |
 | 配色、圆角、动效时长 | `src/styles/global.css` 顶部的设计令牌 |
 | 图标 | `src/components/icons.ts` |
@@ -242,7 +243,7 @@ draft: false
 
 - `topic` 决定这篇长文挂在哪儿：`blog` 只进博客列表，其余的会同时出现在对应
   兴趣页的侧栏（比如 `watching` 出现在影视页的「观后感」里）。
-- `draft: true` 的文章不会出现在列表、标签页和 RSS 里，适合写一半先存着。
+- `draft: true` 的文章不会出现在列表和标签页里，适合写一半先存着。
 - 标签不用登记，写进 `tags` 就自动出现在标签云和 `/blog/tags/<标签>/` 页面。
 - 文件名就是 URL：`hello.md` → `/blog/hello/`。用英文短横线命名，别用中文和空格。
 

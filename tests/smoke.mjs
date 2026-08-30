@@ -142,6 +142,34 @@ ok('彩蛋默认收起', pianoHidden);
 await page.goto(BASE + '/interests/reading/', { waitUntil: 'networkidle' });
 ok('读书页彩蛋收在折叠里', await page.locator('details.lab').count() === 1);
 
+// ——— 闪念 ———
+await page.goto(BASE + '/sparks/', { waitUntil: 'networkidle' });
+ok('闪念页可访问', (await page.title()).includes('闪念'), await page.title());
+const jots = await page.locator('.jot').count();
+ok('闪念有内容', jots > 20, `${jots} 条`);
+// global.css 里有一个同名的 .spark（首页股票迷你柱：flex + 固定 44px 高）。
+// 撞上之后每条被压成 44px，多行的直接叠在一起 —— 页面还是 200，肉眼才看得出来。
+// 所以这里量的是真实高度，不是"元素在不在"。
+const jotGrows = await page.evaluate(() => {
+  const hs = [...document.querySelectorAll('.jot')].map((e) => e.getBoundingClientRect().height);
+  return new Set(hs.map(Math.round)).size > 1 && Math.max(...hs) > 60;
+});
+ok('多行的条目撑得开（没被全局 .spark 压扁）', jotGrows);
+// 单个换行在 Markdown 里会被并成空格，但这些断行是作者的语气（诗、清单、引文）
+const jotWrap = await page.evaluate(() =>
+  [...document.querySelectorAll('.jot .body p')].some(
+    (p) => getComputedStyle(p).whiteSpace === 'pre-wrap' && p.textContent.includes('\n')
+  )
+);
+ok('闪念的换行会保留 — pre-wrap', jotWrap);
+// 只写了日期的存 T00:00:00+08:00，页面靠这个哨兵只显示日期
+const times = await page.locator('.jot .when .t').count();
+ok('写了时刻的显示时刻，没写的不显示', times > 0 && times < jots, `${times}/${jots}`);
+const foldBefore = await page.locator('details.fold').first().evaluate((e) => e.open);
+await page.click('details.fold summary');
+const foldAfter = await page.locator('details.fold').first().evaluate((e) => e.open);
+ok('超长的那条默认折起、点开能展开', foldBefore === false && foldAfter === true);
+
 // ——— 影视页 ———
 await page.goto(BASE + '/interests/watching/', { waitUntil: 'networkidle' });
 ok('影视页可访问', (await page.title()).includes('影视'), await page.title());

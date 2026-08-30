@@ -106,8 +106,20 @@ export function peekTitle(raw, fallback) {
   if (title) return title;
   const date = raw.match(/^date:\s*"?(\d{4}-\d{2}-\d{2})/m)?.[1];
   const place = raw.match(/^place:\s*"?(.+?)"?\s*$/m)?.[1];
-  if (date) return date + (place ? ' · ' + place : '');
-  return place ?? fallback;
+  // 闪念既没有 title 也没有 place，只剩日期的话侧栏就是一串一模一样的条目，
+  // 补一句正文开头才认得出
+  const hint = place ?? firstLine(raw);
+  if (date) return date + (hint ? ' · ' + hint : '');
+  return hint ?? fallback;
+}
+
+/** 正文的第一行，截短了给侧栏当辨识度用 */
+function firstLine(raw) {
+  const body = raw.replace(/^---\n[\s\S]*?\n---\n/, '');
+  const line = body.split('\n').find((l) => l.trim());
+  if (!line) return null;
+  const t = line.trim();
+  return t.length > 18 ? t.slice(0, 18) + '…' : t;
 }
 
 /**

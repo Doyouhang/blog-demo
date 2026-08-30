@@ -114,7 +114,7 @@ test('正常请求不受影响', async () => {
   const r = await fetch(B + '/api/state', { headers: { origin: B } });
   assert.ok(r.ok);
   const d = await r.json();
-  assert.deepEqual(Object.keys(d.types).sort(), ['essays', 'items', 'moments']);
+  assert.deepEqual(Object.keys(d.types).sort(), ['essays', 'items', 'moments', 'sparks']);
 });
 
 test('上传 HEIC 要给人话，不能把编解码器的报错原样甩出来', async () => {

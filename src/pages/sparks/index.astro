@@ -1,0 +1,144 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { getCollection, render } from 'astro:content';
+import { cstYear, cstYearMonth, cstMonthDay, cstTime } from '../../utils/cst';
+
+const B = import.meta.env.BASE_URL;
+
+const all = (await getCollection('sparks', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+// render() 只能在页面这层 await，组件里做不了
+const rendered = await Promise.all(
+  all.map(async (s) => {
+    const body = s.body ?? '';
+    return {
+      spark: s,
+      Content: (await render(s)).Content,
+      // 绝大多数闪念就一两句；偶尔一条长的会把整条时间线撑断，折起来
+      long: body.replace(/\s/g, '').length > 200,
+      peek: (body.split('\n').find((l) => l.trim()) ?? '').trim(),
+    };
+  })
+);
+
+// 按年月分组，跨度才读得出来
+const groups = new Map<string, typeof rendered>();
+for (const r of rendered) {
+  const key = cstYearMonth(r.spark.data.date);
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key)!.push(r);
+}
+
+const years = [...new Set(all.map((s) => cstYear(s.data.date)))].sort((a, b) => b - a);
+const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : String(years[0] ?? '');
+---
+<BaseLayout title="闪念" description="想到什么记什么：一句话、一个念头、一段读完之后的反应。">
+  <div class="container">
+    <PageHeader
+      eyebrow={all.length ? `${all.length} 条 · ${span}` : '时间线'}
+      title="闪念"
+      lead="想到什么记什么。大多是一句话，偶尔写长一点。没有主题，按时间排。"
+    />
+
+    {all.length === 0 ? (
+      <p class="empty">还没有记录。在 <code>src/content/sparks/</code> 下新建一个 md 就行。</p>
+    ) : (
+      <div class="stream">
+        {[...groups].map(([month, list]) => (
+          <section class="month">
+            <h2 class="month-hd">{month}</h2>
+            {list.map(({ spark, Content, long, peek }) => (
+              <article class="jot">
+                <div class="when">
+                  <span class="d">{cstMonthDay(spark.data.date)}</span>
+                  {cstTime(spark.data.date) && <span class="t">{cstTime(spark.data.date)}</span>}
+                </div>
+                {long ? (
+                  <details class="fold">
+                    <summary>
+                      <span class="peek">{peek.length > 34 ? peek.slice(0, 34) + '…' : peek}</span>
+                      <span class="fold-hint"></span>
+                    </summary>
+                    <div class="body"><Content /></div>
+                  </details>
+                ) : (
+                  <div class="body"><Content /></div>
+                )}
+              </article>
+            ))}
+          </section>
+        ))}
+      </div>
+    )}
+
+    {years.length > 0 && (
+      <nav class="years" aria-label="年度回顾">
+        {years.map((y) => <a href={`${B}year/${y}/`}>{y} 年回顾 →</a>)}
+      </nav>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .month + .month { margin-top: 8px; }
+  .month-hd {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    margin: 34px 0 0; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .month:first-child .month-hd { margin-top: 0; }
+
+  /* global.css:349 给 article 定了 720px 的正文行宽并居中 —— 那是给长文用的。
+     这里的条目要和月份标题左右对齐，不然分隔线会错开一截 */
+  .jot {
+    max-width: none; margin: 0;
+    display: grid; grid-template-columns: 86px 1fr; gap: 18px;
+    padding: 18px 0; border-bottom: 1px solid var(--border);
+  }
+  .month:last-child .jot:last-child { border-bottom: 0; }
+  .when {
+    display: flex; flex-direction: column; gap: 2px; padding-top: 3px;
+    font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .when .t { font-size: 12px; opacity: .7; }
+
+  /* Markdown 会把单个换行并成空格，但这些句子的断行本身就是作者的语气
+     （诗、清单、加缪那段引文），所以保留原样 */
+  .body { font-size: 15px; line-height: 1.9; }
+  .body :global(p) { margin: 0; white-space: pre-wrap; }
+  .body :global(p + p) { margin-top: 14px; }
+
+  /* 折叠：和收藏卡片的长短评用同一套手势 */
+  .fold summary {
+    cursor: pointer; list-style: none; display: flex; gap: 8px;
+    align-items: baseline; flex-wrap: wrap;
+    font-size: 15px; line-height: 1.9; color: var(--muted);
+  }
+  .fold summary::-webkit-details-marker { display: none; }
+  .fold .fold-hint { color: var(--accent); font-size: 13px; white-space: nowrap; }
+  .fold .fold-hint::after { content: '展开'; }
+  .fold[open] .fold-hint::after { content: '收起'; }
+  .fold[open] .peek { display: none; }
+  .fold[open] summary { margin-bottom: 10px; }
+
+  .years {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  .years a { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .years a:hover { color: var(--accent); }
+
+  .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
+  .empty code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+  }
+
+  @media (max-width: 560px) {
+    .jot { grid-template-columns: 1fr; gap: 6px; }
+    .when { flex-direction: row; gap: 8px; padding-top: 0; }
+  }
+</style>
