@@ -23,11 +23,17 @@ export const TYPES = {
     hint: '听过的歌、读过的书、看过的片。想细说的另写长文，在这里关联过去。',
     dir: 'src/content/items',
     flat: true,
+    // 侧栏列表按类型分组：书 / 音乐 / 影视 各成一段
+    groupBy: 'kind',
+    // 「按标题匹配信息」那个按钮挂在哪个字段的右上角
+    matchFrom: 'title',
+    // 封面栏插在哪个字段后面（挨着作者，搜完信息顺手就看到图）
+    coverAfter: 'creator',
     bodyLabel: '',
     bodyRequired: false,
     fields: [
       { key: 'kind', label: '类型', type: 'select', required: true,
-        options: [{ v: 'book', t: '书' }, { v: 'song', t: '歌' }, { v: 'movie', t: '影视' }] },
+        options: [{ v: 'book', t: '书' }, { v: 'song', t: '音乐' }, { v: 'movie', t: '影视' }] },
       { key: 'title', label: '标题', type: 'text', required: true },
       { key: 'creator', label: '作者 / 歌手 / 导演', type: 'text', required: true },
       { key: 'date', label: '听到 / 读完 / 看完的时间', type: 'date', required: true },

@@ -31,6 +31,10 @@ const IMAGE_HOSTS = [
   /^y\.qq\.com$/,
   /^p\d*\.music\.126\.net$/,
   /^p\d*\.pipi\.cn$/,
+  // 微信读书的封面散在三个域名上，同一次搜索的结果里三种都会出现
+  /^cdn\.weread\.qq\.com$/,
+  /^rescdn\.qqmail\.com$/,
+  /^wfqqreader-\d+\.image\.myqcloud\.com$/,   // 别写成 *.myqcloud.com，那是整个腾讯云对象存储
 ];
 
 export function isAllowedImageUrl(raw) {
@@ -61,6 +65,8 @@ export function bigImageUrl(url) {
   if (/mzstatic\.com/.test(u)) return u.replace(/\/\d+x\d+bb\.jpg$/, '/600x600bb.jpg');
   if (/y\.gtimg\.cn|y\.qq\.com/.test(u)) return u.replace(/T002R\d+x\d+M000/, 'T002R500x500M000');
   if (/music\.126\.net/.test(u)) return u.split('?')[0] + '?param=600y600';
+  // 微信读书把尺寸写在文件名前缀里：s_ 是缩略图，t9_ 是大图（实测 7KB → 200KB）
+  if (/weread\.qq\.com|qqmail\.com|myqcloud\.com/.test(u)) return u.replace(/\/(?:s|t\d+)_/, '/t9_');
   return u;
 }
 
@@ -125,6 +131,24 @@ export function fromDoubanSuggest(body, kind) {
       subtitle: String(c.abstract ?? ''),
       thumb: toHttps(c.cover_url),
       full: bigImageUrl(c.cover_url),
+    }));
+}
+
+/**
+ * 微信读书。搜书这一类里它的作者字段最准（「[美]黄仁宇」这种译者标注都带着），
+ * 而豆瓣那个通用入口根本给不出作者。不用登录，直接出 JSON。
+ */
+export function fromWeread(body) {
+  return (body?.books ?? [])
+    .map((b) => b?.bookInfo)
+    .filter((i) => i?.title && i?.cover)
+    .map((i) => ({
+      source: '微信读书',
+      title: String(i.title),
+      creator: String(i.author ?? ''),
+      subtitle: String(i.author ?? ''),
+      thumb: toHttps(i.cover),
+      full: bigImageUrl(i.cover),
     }));
 }
 
@@ -200,6 +224,11 @@ const doubanSuggest = (kind) => ['豆瓣', async (q) =>
 // 而它当时是影视唯一的源，于是影视一张图都搜不出来。
 const QUERIES = {
   book: [
+    // 微信读书排第一：他平时就用这个，而且作者字段最全
+    ['微信读书', async (q) =>
+      fromWeread(await fetchJson(
+        `https://weread.qq.com/web/search/global?keyword=${encodeURIComponent(q)}&maxIdx=0&fragmentSize=120&count=6`,
+        { Referer: 'https://weread.qq.com/' }))],
     doubanSuggest('book'),
     ['豆瓣图书', async (q) =>
       fromDoubanBook(await fetchJson(
@@ -273,7 +302,13 @@ export async function fetchCoverImage(url, maxBytes = 8 * 1024 * 1024) {
     headers: { 'User-Agent': UA, ...(referer ? { Referer: referer } : {}) },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!r.ok) throw new Error(`取图失败 HTTP ${r.status}`);
+  if (!r.ok) {
+    // 带上上游状态码：微信读书偶尔给出已经失效的封面地址（404），
+    // 那是「这张图没了」，不是「服务端出错了」，不该一律报 500
+    const e = new Error(`取图失败 HTTP ${r.status}`);
+    e.status = r.status;
+    throw e;
+  }
   const type = r.headers.get('content-type') ?? '';
   if (!type.startsWith('image/')) throw new Error(`返回的不是图片（${type || '无类型'}）`);
   const buf = Buffer.from(await r.arrayBuffer());

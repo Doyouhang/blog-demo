@@ -97,7 +97,18 @@
                background: none; color: var(--muted); cursor: pointer; font-size: 11px; }
   .cover-box { display: flex; gap: 12px; align-items: flex-start; }
   .cover-box img { width: 90px; border-radius: 8px; border: 1px solid var(--border); display: block; }
-  .cover-find { margin-top: 8px; }
+  .list-group {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted);
+  }
+  .list-group span { font-weight: 400; }
+  .f-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  button.mini {
+    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; font-size: 12px;
+  }
+  button.mini.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.mini:hover { filter: brightness(1.08); }
   .cover-hits {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
     gap: 8px; margin-top: 10px;
@@ -180,12 +191,30 @@ function renderTypes() {
 
 function renderList() {
   const items = S.collections[cur.type] ?? [];
-  $('#list').innerHTML =
-    `<button class="new">＋ 新建</button>` +
-    items.map((e) => {
-      const isDraft = e.front?.draft === true || String(e.front?.draft) === 'true';
-      return `<button data-id="${e.id}" class="${isDraft ? 'draft' : ''}" aria-current="${e.id === cur.id}">${e.title}</button>`;
-    }).join('');
+  const t = S.types[cur.type];
+  const btn = (e) => {
+    const isDraft = e.front?.draft === true || String(e.front?.draft) === 'true';
+    return `<button data-id="${e.id}" class="${isDraft ? 'draft' : ''}" aria-current="${e.id === cur.id}">${e.title}</button>`;
+  };
+
+  let html = `<button class="new">＋ 新建</button>`;
+  const groupKey = t.groupBy;
+  const opts = groupKey ? (t.fields.find((f) => f.key === groupKey)?.options ?? []) : [];
+  if (groupKey && opts.length) {
+    for (const o of opts) {
+      const mine = items.filter((e) => String(e.front?.[groupKey] ?? '') === o.v);
+      if (!mine.length) continue;
+      html += `<div class="list-group">${escapeHtml(o.t)}<span>${mine.length}</span></div>` + mine.map(btn).join('');
+    }
+    // 值不在选项里的条目也得列出来（手写的 md、以后新增的类型），
+    // 否则它们会从侧栏里凭空消失，而文件明明还在
+    const known = new Set(opts.map((o) => o.v));
+    const rest = items.filter((e) => !known.has(String(e.front?.[groupKey] ?? '')));
+    if (rest.length) html += `<div class="list-group">其他<span>${rest.length}</span></div>` + rest.map(btn).join('');
+  } else {
+    html += items.map(btn).join('');
+  }
+  $('#list').innerHTML = html;
   $('#list').onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -249,7 +278,11 @@ function shows(f) {
 function field(f) {
   const v = cur.front[f.key] ?? '';
   const req = f.required ? ' <span class="req">*</span>' : '';
-  const head = `<span>${f.label}${req}</span>`;
+  // 「按标题匹配信息」挂在 schema 指定的那个字段右上角 ——
+  // 挨着标题点，比翻到下面封面栏里再点直观
+  const action = f.key === (S.types[cur.type].matchFrom ?? '')
+    ? `<button type="button" id="cover-go" class="mini primary">按标题匹配信息</button>` : '';
+  const head = `<span class="f-label">${f.label}${req}${action}</span>`;
   if (f.type === 'select')
     return `<label class="f">${head}<select data-k="${f.key}">${f.options
       .map((o) => `<option value="${o.v}"${String(v) === o.v ? ' selected' : ''}>${o.t}</option>`).join('')}</select></label>`;
@@ -287,20 +320,21 @@ function renderForm() {
   const visible = t.fields.filter(shows);
   const mediaDir = t.flat ? t.dir.split('/').pop() : `${t.dir.split('/').pop()}/${cur.id ?? ''}`;
 
-  $('#form').innerHTML = `<div class="form-inner">
-    ${cur.id ? '' : '<div class="tip">新建的条目会在第一次保存时确定文件名。</div>'}
-    ${visible.map(field).join('')}
-    ${t.cover ? `<label class="f"><span>封面</span>
+  // 封面栏先拼好，好插到 coverAfter 指定的字段后面。
+  // coverAfter 指的字段要是被 onlyWhen 藏起来了，就退回到末尾 —— 不能让封面栏整个消失。
+  const coverBox = !t.cover ? '' : `<label class="f"><span>封面</span>
       <div class="cover-box">
         ${cur.cover ? `<img src="/media/${mediaDir}/${String(cur.cover).replace('./', '')}" alt="" />` : ''}
         <div style="flex:1">
           <div class="drop" id="drop-cover" role="button" tabindex="0" aria-label="选择或拖入封面">拖一张封面进来，或点击/按回车选择</div>
-          <div class="cover-find">
-            <button type="button" id="cover-go">按标题搜封面</button>
-          </div>
           <div class="cover-hits" id="cover-hits"></div>
         </div>
-      </div></label>` : ''}
+      </div></label>`;
+
+  $('#form').innerHTML = `<div class="form-inner">
+    ${cur.id ? '' : '<div class="tip">新建的条目会在第一次保存时确定文件名。</div>'}
+    ${visible.map((f) => field(f) + (t.cover && f.key === t.coverAfter ? coverBox : '')).join('')}
+    ${t.cover && !visible.some((f) => f.key === t.coverAfter) ? coverBox : ''}
     ${t.photos ? `<label class="f"><span>照片</span>
       <div class="drop" id="drop-photos" role="button" tabindex="0" aria-label="选择或拖入照片">把照片拖进来（可多张），也可以按回车选择。会自动压缩，并读出拍摄时间和相机参数。</div>
       <div class="shots" id="shots"></div></label>` : ''}
@@ -426,7 +460,7 @@ async function findCovers() {
   const kind = String(cur.front.kind ?? '');
   // 直接用标题。上面刚填过一遍，再让人输一次是白费事
   const q = String(cur.front.title ?? '').trim();
-  if (!q) { box.innerHTML = '<p class="tip">先把上面的标题填了，再来搜封面。</p>'; return; }
+  if (!q) { box.innerHTML = '<p class="tip">先把标题填了，再点「按标题匹配信息」。</p>'; return; }
   box.innerHTML = '<p class="tip">搜索中…</p>';
   try {
     const r = await api(`/api/cover/search?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q)}`);
@@ -446,6 +480,10 @@ async function findCovers() {
       (dead ? `<p class="tip">${escapeHtml(dead)} 这次没响应，下面是其余来源的结果。</p>` : '');
     box.querySelectorAll('.cover-hit').forEach((b) => {
       b.onclick = () => pickCover(r.results[Number(b.dataset.i)]);
+      // 有的源会给出已经失效的封面地址。图取不回来就把这个候选撤掉，
+      // 留个空白格子在那儿只会让人以为是自己网卡了
+      const img = b.querySelector('img');
+      if (img) img.onerror = () => b.remove();
     });
   } catch (e) {
     // 这些都是非公开接口，挂了是常态。挂了也只是搜不到，拖图那条路照旧
@@ -463,6 +501,8 @@ async function pickCover(hit) {
       body: JSON.stringify({
         type: cur.type, slug: cur.id ?? '', url: hit.full,
         name: hit.title,
+        // 让服务端把上一张删了，免得反复试封面攒下一堆一模一样的图
+        replacing: cur.cover ?? null,
       }),
     });
     cur.cover = r.src;

@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isAllowedImageUrl, toHttps, bigImageUrl,
-  fromDoubanBook, fromDoubanMovie, fromDoubanSuggest, fromMaoyan, fromQQ, fromItunes, fromNetease,
+  fromDoubanBook, fromDoubanMovie, fromDoubanSuggest, fromMaoyan, fromWeread, fromQQ, fromItunes, fromNetease,
   searchCovers, fetchCoverImage,
 } from '../studio/covers.mjs';
 
@@ -319,4 +319,43 @@ test('去重：带作者的那条要赢过只有副标题的', async () => {
     assert.ok(withCreator.length >= 1, '至少要留下一条带作者的');
     assert.equal(withCreator[0].creator, '姜文');
   } finally { globalThis.fetch = real; }
+});
+
+test('微信读书：书名和作者都要拿到', () => {
+  const out = fromWeread({ books: [
+    { bookInfo: { title: '万历十五年（经典版）', author: '[美]黄仁宇',
+      cover: 'https://cdn.weread.qq.com/weread/cover/44/abc/s_abc.jpg' } },
+    { bookInfo: { title: '没有封面的' } },
+    { },
+  ] });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].creator, '[美]黄仁宇', '译者标注也要原样带着');
+  assert.equal(out[0].source, '微信读书');
+  assert.equal(out[0].full, 'https://cdn.weread.qq.com/weread/cover/44/abc/t9_abc.jpg', 's_ 换成 t9_ 才是大图');
+});
+
+test('微信读书的三个封面域名都要在白名单里', () => {
+  // 同一次搜索的结果里这三种都会出现，漏一个就有图显示不出来
+  for (const u of [
+    'https://cdn.weread.qq.com/weread/cover/44/abc/s_abc.jpg',
+    'https://rescdn.qqmail.com/weread/cover/11/3200000011/s_3200000011.jpg',
+    'https://wfqqreader-1252317822.image.myqcloud.com/cover/995/840995/s_840995.jpg',
+  ]) assert.equal(isAllowedImageUrl(u), true, u);
+});
+
+test('腾讯云对象存储不能整个放行', () => {
+  // wfqqreader-<数字> 是微信读书自己的桶。写成 *.myqcloud.com 的话，
+  // 任何人开一个腾讯云存储桶都能让服务端去请求
+  assert.equal(isAllowedImageUrl('https://someoneelse.image.myqcloud.com/x.jpg'), false);
+  assert.equal(isAllowedImageUrl('https://wfqqreader-abc.image.myqcloud.com/x.jpg'), false);
+  assert.equal(isAllowedImageUrl('https://cdn.weread.qq.com.evil.com/x.jpg'), false);
+});
+
+test('微信读书大图：已经是 t 开头的尺寸也要换成 t9_', () => {
+  assert.equal(
+    bigImageUrl('https://cdn.weread.qq.com/weread/cover/44/abc/t6_abc.jpg'),
+    'https://cdn.weread.qq.com/weread/cover/44/abc/t9_abc.jpg');
+  assert.equal(
+    bigImageUrl('https://rescdn.qqmail.com/weread/cover/11/x/s_x.jpg'),
+    'https://rescdn.qqmail.com/weread/cover/11/x/t9_x.jpg');
 });

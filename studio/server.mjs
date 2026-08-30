@@ -4,7 +4,7 @@
 // 变成需要 SSR adapter 的混合模式（GitHub Pages 跑不了），还要拉进 React 全家桶。
 // 更关键的是它不做 EXIF 提取和图片压缩 —— 那恰恰是这个编辑器的核心价值。
 import { createServer } from 'node:http';
-import { readFile, writeFile, readdir, mkdir, stat } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdir, stat, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -244,6 +244,22 @@ async function saveNote(itemSlug, itemFront, note) {
   return id;
 }
 
+/**
+ * 删掉条目目录里的一个文件。只接受「同目录下的单个文件名」——
+ * 传进来的是 md 里那个 ./xxx.jpg，带路径分隔符的一律不认，
+ * 再加 assertInside 兜一道，免得拿它删到内容目录外面去。
+ */
+async function removeSibling(type, slug, rel) {
+  const t = TYPES[type];
+  if (!t) return;
+  const name = String(rel ?? '').replace(/^\.\//, '');
+  if (!name || name.includes('/') || name.includes('\\') || name.includes('\0')) return;
+  const dir = t.flat ? path.join(ROOT, t.dir) : path.join(ROOT, t.dir, safeSegment(slug) ?? '');
+  const file = path.join(dir, name);
+  assertInside(file, t.dir);
+  try { await rm(file); } catch { /* 已经不在了就算了 */ }
+}
+
 // ——— 路由 ———
 
 const routes = {
@@ -307,9 +323,13 @@ const routes = {
 
   // 选中一张：取大图 → 走和手动上传同一条处理链（压缩、存进条目目录）
   'POST /api/cover/pick': async (body, _url) => {
-    const { type, slug, url: imageUrl, name } = JSON.parse(body);
+    const { type, slug, url: imageUrl, name, replacing } = JSON.parse(body);
     const { buf } = await fetchCoverImage(imageUrl);
-    return saveImageInto(type, slug, (name || 'cover') + '.jpg', buf);
+    const saved = await saveImageInto(type, slug, (name || 'cover') + '.jpg', buf);
+    // 换封面时把上一张删掉。不删的话每试一次就留一张几百 KB 的孤儿，
+    // 而且它们往往长得一模一样，事后根本分不清哪张还在用。
+    if (replacing && replacing !== saved.src) await removeSibling(type, slug, replacing);
+    return saved;
   },
 
 
@@ -366,9 +386,18 @@ const server = createServer(async (req, res) => {
           res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
           return res.end('图片地址不在允许的来源里');
         }
-        const { buf, type } = await fetchCoverImage(u, 4 * 1024 * 1024);
-        res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
-        return res.end(buf);
+        let picture;
+        try {
+          picture = await fetchCoverImage(u, 4 * 1024 * 1024);
+        } catch (e) {
+          // 上游说这张图没了就照实说 404，别一律报 500 ——
+          // 前端据此把那个候选悄悄撤掉，而不是留一个空白格子
+          const code = e.status >= 400 && e.status < 500 ? e.status : 502;
+          res.writeHead(code, { 'content-type': 'text/plain; charset=utf-8' });
+          return res.end(e.message ?? '取图失败');
+        }
+        res.writeHead(200, { 'content-type': picture.type, 'cache-control': 'no-store' });
+        return res.end(picture.buf);
       }
       if (url.pathname === '/' || url.pathname === '/index.html') {
         const html = await readFile(path.join(here, 'index.html'));

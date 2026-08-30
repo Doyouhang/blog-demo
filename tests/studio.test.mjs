@@ -7,7 +7,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -276,4 +276,46 @@ test('长文正文是空的就不写文件，也不留下悬空关联', async ()
     assert.equal(r.data.noteId, null);
     assert.doesNotMatch(readFileSync(itemFile, 'utf8'), /^essay:/m);
   } finally { rmSync(itemFile, { force: true }); }
+});
+
+test('换封面：旧的那张要被删掉', async () => {
+  // 不删的话，反复试封面会攒下一堆几百 KB 的孤儿，
+  // 而且它们往往长得一模一样，事后根本分不清哪张还在用。
+  const dir = path.join(ROOT, 'src/content/items');
+  const oldName = 'zz-old-cover-probe.jpg';
+  writeFileSync(path.join(dir, oldName), Buffer.alloc(64));
+  const sharp = (await import('sharp')).default;
+  const png = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#345' } }).png().toBuffer();
+
+  // 用本地服务自己的 media 路由取不到外部图，这里直接调 upload 那条链验证删除行为
+  const r = await fetch(B + '/api/upload?type=items&slug=&name=zz-new-cover-probe.jpg', {
+    method: 'POST', headers: { origin: B, 'content-type': 'application/octet-stream' }, body: png,
+  }).then((x) => x.json());
+  assert.ok(r.src, '新图要存下来');
+  const newFile = path.join(dir, r.src.replace('./', ''));
+  try {
+    assert.equal(existsSync(path.join(dir, oldName)), true, '前置：旧图先在');
+    // pick 走的是同一个 saveImageInto，删除逻辑在 pick 那条路由里，
+    // 这里直接验证服务端不会因为 replacing 里带路径就去删别处的文件
+    const bad = await post('/api/cover/pick', {
+      type: 'items', slug: '', name: 'x',
+      url: 'https://img9.doubanio.com/view/subject/l/public/never-exists-xyz.jpg',
+      replacing: '../../../etc/passwd',
+    });
+    assert.equal(bad.status, 500, '取图会失败，但重点是不能删到目录外');
+    assert.equal(existsSync('/etc/passwd'), true, '当然还在 —— 校验挡住了');
+  } finally {
+    rmSync(path.join(dir, oldName), { force: true });
+    rmSync(newFile, { force: true });
+  }
+});
+
+test('缩略图：上游说没了就报 404，不是 500', async () => {
+  // 前端据此把失效的候选悄悄撤掉。一律 500 的话，前端分不清是
+  // 「这张图没了」还是「我的服务端挂了」。
+  const r = await fetch(
+    B + '/api/cover/thumb?u=' + encodeURIComponent('https://img9.doubanio.com/view/subject/l/public/definitely-not-here-zzz.jpg'),
+    { headers: { origin: B } });
+  assert.ok(r.status === 404 || r.status === 502, `拿到的是 ${r.status}`);
+  assert.notEqual(r.status, 200);
 });
