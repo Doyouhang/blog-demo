@@ -1,25 +1,58 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
-import EssayCard from '../components/EssayCard.astro';
+import RecentUpdates from '../components/RecentUpdates.astro';
+import { Image } from 'astro:assets';
 import type { IconName } from '../components/icons';
 import { getCollection } from 'astro:content';
 import { interests } from '../data/interests';
 import { AUTHOR } from '../consts';
 import nowData from '../data/now.json';
 import stockData from '../data/stocks.json';
+import { cstISODate } from '../utils/cst';
 
 const B = import.meta.env.BASE_URL;
 
-const posts = (await getCollection('essays'))
-  .filter((p) => !p.data.draft)
-  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
-  .slice(0, 3);
+const [rawItems, rawMoments] = await Promise.all([
+  getCollection('items', ({ data }) => !data.draft),
+  getCollection('moments', ({ data }) => !data.draft),
+]);
+const byNewest = (a: { data: { date: Date } }, b: { data: { date: Date } }) =>
+  b.data.date.valueOf() - a.data.date.valueOf();
+const items = [...rawItems].sort(byNewest);
+const moments = [...rawMoments].sort(byNewest);
 
-// 「此刻」：手动维护的近况。数据结构和 stocks.json 一致，
-// 将来接 Gist 只要加一个构建期抓取脚本覆盖这个文件，本页不用改。
+// 首屏右边放最近一张照片。有相机、有照片，首页一张不放太浪费了
+const heroMoment = moments[0];
+const heroPhoto = heroMoment?.data.photos[0];
+
+// 兴趣格子上放真封面：三个有收藏的兴趣各取最近一条。
+// 剩下三个没有条目可取，退回图标 —— 六个格子的高度仍然一致
+const KIND_OF: Record<string, 'book' | 'movie' | 'song'> = {
+  reading: 'book', watching: 'movie', music: 'song',
+};
+const latestOf = (slug: string) => {
+  const kind = KIND_OF[slug];
+  return kind ? items.find((i) => i.data.kind === kind) ?? null : null;
+};
+
+// 「此刻」：能从内容里算出来的就不要手写 —— 手写的迟早停在某个日期上。
+// now.json 留给算不出来的（在忙什么、在学什么），会接在自动那几条后面。
 interface NowItem { icon: IconName; text: string }
-const now = nowData as { updatedAt: string; items: NowItem[] };
+const nowRows: NowItem[] = [];
+const readingNow = items.find((i) => i.data.kind === 'book' && i.data.status === 'doing');
+if (readingNow) nowRows.push({ icon: 'book', text: `在读《${readingNow.data.title}》` });
+const watchingNow = items.find((i) => i.data.kind === 'movie' && i.data.status === 'doing');
+if (watchingNow) nowRows.push({ icon: 'play', text: `在看《${watchingNow.data.title}》` });
+const lastSong = items.find((i) => i.data.kind === 'song');
+if (lastSong) nowRows.push({ icon: 'headphones', text: `最近在听 ${lastSong.data.title}` });
+if (heroMoment?.data.place) nowRows.push({ icon: 'camera', text: `最近拍于 ${heroMoment.data.place}` });
+nowRows.push(...((nowData as { items?: NowItem[] }).items ?? []));
+// 「更新于」跟着最新的那条内容走，不再是手填的日期
+const nowAt = [readingNow, watchingNow, lastSong, heroMoment]
+  .filter((e): e is NonNullable<typeof e> => !!e)
+  .map((e) => e.data.date.valueOf())
+  .sort((a, b) => b - a)[0];
 
 // 自选股：取涨跌幅绝对值最大的三只，另外用全部持仓画一排迷你柱
 interface StockRow { code: string; name: string; ok: boolean; percent?: number }
@@ -40,27 +73,32 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
       <div class="intro-links">
         <a href="https://github.com/Doyouhang"><Icon name="github" size={16} />GitHub</a>
       </div>
+      {heroPhoto && (
+        <a class="intro-shot" href={`${B}moments/`} title={heroMoment.data.place ?? '此间'}>
+          <Image src={heroPhoto.src} alt={heroPhoto.alt} width={264} />
+        </a>
+      )}
     </section>
 
     <div class="split">
       <div class="split-main">
         <div class="sec-hd">
-          <h2>最近文章</h2>
-          <a href={`${B}blog/`}>全部文章 →</a>
+          <h2>最近更新</h2>
+          <span class="sec-note">长文、书影音、随手拍和闪念都算</span>
         </div>
-        {posts.map((p) => <EssayCard post={p} />)}
+        <RecentUpdates limit={6} />
       </div>
 
       <aside>
         <section class="side-box reveal">
           <h2>此刻</h2>
-          {now.items.map((item) => (
+          {nowRows.map((item) => (
             <div class="side-row">
               <Icon name={item.icon} size={18} />
               <span>{item.text}</span>
             </div>
           ))}
-          <p class="side-foot">更新于 {now.updatedAt}</p>
+          {nowAt && <p class="side-foot">跟着收藏和照片自动更新 · {cstISODate(new Date(nowAt))}</p>}
         </section>
 
         {movers.length > 0 && (
@@ -97,15 +135,70 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
         <span class="sec-note">攒下来的书、歌和琢磨过的东西</span>
       </div>
       <div class="int-row">
-        {interests.map((i) => (
-          <a class="int-cell reveal" href={`${B}interests/${i.slug}/`}>
-            <span class="int-icon" transition:name={`interest-${i.title}`}>
-              <Icon name={i.icon} size={26} />
-            </span>
-            <b>{i.title}</b>
-          </a>
-        ))}
+        {interests.map((i) => {
+          const latest = latestOf(i.slug);
+          return (
+            <a class="int-cell reveal" href={`${B}interests/${i.slug}/`}>
+              <span class="int-shelf">
+                {latest?.data.cover ? (
+                  <Image src={latest.data.cover} alt="" width={140} />
+                ) : (
+                  <span class="int-big" transition:name={`interest-${i.title}`}>
+                    <Icon name={i.icon} size={26} />
+                  </span>
+                )}
+              </span>
+              <span class="int-name"><Icon name={i.icon} size={15} /><b>{i.title}</b></span>
+              <span class="int-sub">
+                {latest
+                  ? (latest.data.kind === 'song' ? latest.data.title : `《${latest.data.title}》`)
+                  : i.tags[0]}
+              </span>
+            </a>
+          );
+        })}
       </div>
     </div>
   </div>
 </BaseLayout>
+
+<style>
+  /* 首屏右边那张照片：不做成大背景，就是一个能点进时间线的窗口 */
+  .intro-shot {
+    flex-shrink: 0; width: 132px; height: 88px; border-radius: 12px;
+    overflow: hidden; border: 1px solid var(--border); line-height: 0;
+    transition: border-color var(--dur-fast) var(--ease);
+  }
+  .intro-shot:hover { border-color: var(--accent); }
+  .intro-shot :global(img) { width: 100%; height: 100%; object-fit: cover; }
+
+  /* 封面高矮胖瘦各不相同，装进一个等高的框里，六个格子才齐 */
+  .int-shelf {
+    width: 100%; height: 96px; border-radius: 8px; background: var(--bg-soft);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .int-shelf :global(img) {
+    max-height: 84px; max-width: 100%; width: auto; height: auto;
+    border-radius: 4px; object-fit: contain;
+  }
+  .int-big { color: var(--accent); line-height: 0; }
+  /* grid item 默认 min-width:auto。格子里那行书名是 nowrap 的，
+     长一点就会把列撑宽、挤到别的格子 —— 这里让它老实收缩，交给省略号 */
+  .int-cell { min-width: 0; }
+  .int-name { display: flex; align-items: center; gap: 6px; color: var(--accent); line-height: 0; }
+  .int-name b { font-size: 14px; font-weight: 600; color: var(--fg); line-height: 1.4; }
+  .int-sub {
+    font-size: 12px; color: var(--muted); text-align: center; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  @media (max-width: 760px) {
+    .intro-shot { width: 100%; height: 120px; }
+    .int-shelf { height: 76px; }
+    .int-shelf :global(img) { max-height: 66px; }
+  }
+  /* 390px 上四列每格只剩八十来像素，封面和书名都挤成一条 */
+  @media (max-width: 560px) {
+    .int-row { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>

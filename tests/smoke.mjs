@@ -42,6 +42,19 @@ ok('首页兴趣卡片深链', cards.every((h) => /\/interests\/\w+\/$/.test(h ?
 const sideBoxes = await page.$$eval('.side-box h2', (els) => els.map((e) => e.textContent?.trim()));
 ok('首页侧栏「此刻」+ 行情', sideBoxes.length === 2, sideBoxes.join(' / '));
 
+// 「最近更新」是四种内容合的流。只放长文的话，首页只有在写长文的时候才会动，
+// 而长文恰恰是最不常写的 —— 所以这里要的是「类型不止一种」，不是「有内容」。
+const updKinds = await page.evaluate(() =>
+  [...new Set([...document.querySelectorAll('.upd-tag')].map((e) => e.textContent.trim()))]);
+ok('首页最近更新是混流', updKinds.length >= 3, updKinds.join('/'));
+// 改版前首页一张图都没有 —— 封面和照片全在别的页面上
+const homeImgs = await page.evaluate(() =>
+  [...document.querySelectorAll('img')].filter((i) => i.naturalWidth > 0).length);
+ok('首页有真图（封面 / 照片）', homeImgs >= 3, homeImgs + ' 张');
+// 「此刻」不再手写：在读的书由 status=doing 算出来，不会停在某个日期上
+const nowText = await page.evaluate(() => document.querySelector('.side-box')?.textContent ?? '');
+ok('「此刻」从收藏里算出来', /在读|在看|最近在听|最近拍于/.test(nowText), nowText.slice(0, 40));
+
 // 2. 客户端导航（ClientRouter 生效 = 不发生整页刷新）
 await page.evaluate(() => { window.__stillHere = true; });
 await page.click(`.nav-links a[href="${at('/interests/')}"]`);

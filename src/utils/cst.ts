@@ -46,6 +46,12 @@ export function cstMonthDay(d: Date): string {
   return `${p.month} 月 ${p.day} 日`;
 }
 
+/** 「2026-08-30」 */
+export function cstISODate(d: Date): string {
+  const p = parts(d);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
 /**
  * 「21:49」。整点午夜返回 null —— 只写了日期、没写时刻的记录存成
  * `T00:00:00+08:00`，用它当哨兵，页面上就只显示日期。

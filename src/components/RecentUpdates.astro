@@ -1,0 +1,140 @@
+---
+// 首页的「最近更新」：把四种内容合成一条流。
+//
+// 原来这块只放长文 —— 于是首页只有在写长文的时候才会动，而长文恰恰是
+// 最不常写的那种。合流之后，加一条闪念、换一张封面、发一组照片，首页都会变。
+import { Image } from 'astro:assets';
+import Icon from './Icon.astro';
+import type { IconName } from './icons';
+import { getCollection } from 'astro:content';
+import { cstISODate } from '../utils/cst';
+
+interface Props {
+  /** 取最近几条 */
+  limit?: number;
+}
+const { limit = 6 } = Astro.props;
+const B = import.meta.env.BASE_URL;
+
+const [essays, items, moments, sparks] = await Promise.all([
+  getCollection('essays', ({ data }) => !data.draft),
+  getCollection('items', ({ data }) => !data.draft),
+  getCollection('moments', ({ data }) => !data.draft),
+  getCollection('sparks', ({ data }) => !data.draft),
+]);
+
+/**
+ * 正文开头，截短了当标题用（闪念和动态都没有 title）。
+ * 换行一律折成空格 —— 只取第一行的话，像影评那种起手一个短句
+ * 「"如果，」就成了整条摘要，看着像坏了。
+ */
+function lead(text: string, max = 42): string {
+  const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
+  return flat.length > max ? flat.slice(0, max) + '…' : flat;
+}
+
+const KIND = {
+  book: { label: '读书', page: 'reading', icon: 'book' as IconName },
+  movie: { label: '影视', page: 'watching', icon: 'play' as IconName },
+  song: { label: '音乐', page: 'music', icon: 'headphones' as IconName },
+};
+// 长文按归属给图标，比统一给一个"文章"图标有信息量
+const TOPIC_ICON: Record<string, IconName> = {
+  blog: 'compass', reading: 'book', music: 'headphones',
+  watching: 'play', cooking: 'pot', coding: 'code',
+};
+
+interface Row {
+  date: Date; label: string; title: string; note?: string;
+  href: string; icon: IconName; cover?: ImageMetadata;
+}
+
+const rows: Row[] = [
+  ...essays.map((e) => ({
+    date: e.data.pubDate, label: '长文', title: e.data.title,
+    note: e.data.description, href: `${B}blog/${e.id}/`,
+    icon: TOPIC_ICON[e.data.topic] ?? 'compass',
+  })),
+  ...items.map((i) => ({
+    date: i.data.date, label: KIND[i.data.kind].label,
+    title: i.data.kind === 'song' ? i.data.title : `《${i.data.title}》`,
+    note: lead(i.data.blurb), href: `${B}interests/${KIND[i.data.kind].page}/`,
+    icon: KIND[i.data.kind].icon, cover: i.data.cover,
+  })),
+  ...moments.map((m) => ({
+    date: m.data.date, label: '此间', title: m.data.place ?? '随手拍',
+    note: lead(m.body ?? ''), href: `${B}moments/`,
+    icon: 'camera' as IconName, cover: m.data.photos[0]?.src,
+  })),
+  ...sparks.map((s) => ({
+    date: s.data.date, label: '闪念', title: lead(s.body ?? '', 52),
+    href: `${B}sparks/`, icon: 'bulb' as IconName,
+  })),
+]
+  .sort((a, b) => b.date.valueOf() - a.date.valueOf())
+  .slice(0, limit);
+---
+<div class="upds">
+  {rows.map((r) => (
+    <a class="upd" href={r.href}>
+      {r.cover ? (
+        <Image class="upd-thumb" src={r.cover} alt="" width={132} />
+      ) : (
+        <span class="upd-thumb upd-blank"><Icon name={r.icon} size={24} /></span>
+      )}
+      <span class="upd-body">
+        <span class="upd-hd">
+          <span class="upd-tag">{r.label}</span>
+          <time datetime={cstISODate(r.date)}>{cstISODate(r.date)}</time>
+        </span>
+        <b>{r.title}</b>
+        {r.note && <span class="upd-note">{r.note}</span>}
+      </span>
+    </a>
+  ))}
+</div>
+
+<style>
+  .upds { display: flex; flex-direction: column; }
+  .upd {
+    display: grid; grid-template-columns: 66px 1fr; gap: 16px; align-items: center;
+    padding: 14px 0; border-bottom: 1px solid var(--border); color: inherit;
+  }
+  .upd:last-child { border-bottom: 0; }
+  .upd:hover { text-decoration: none; }
+  .upd:hover b { color: var(--accent); }
+
+  /* 封面比例各不相同（书是竖的、歌是方的），统一裁进一个固定的框，
+     一排扫下来标题才在同一条竖线上 */
+  .upd :global(.upd-thumb) {
+    width: 66px; height: 66px; border-radius: 10px; display: block;
+    object-fit: cover; background: var(--bg-soft); border: 1px solid var(--border);
+  }
+  .upd-blank {
+    display: flex; align-items: center; justify-content: center; color: var(--accent);
+  }
+
+  .upd-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .upd-hd {
+    display: flex; align-items: baseline; gap: 10px;
+    font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .upd-tag {
+    color: var(--accent); background: var(--accent-weak);
+    border-radius: 999px; padding: 1px 9px; font-size: 11px;
+  }
+  .upd b {
+    font-size: 15px; font-weight: 600;
+    transition: color var(--dur-fast) var(--ease);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .upd-note {
+    font-size: 13px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    .upd { grid-template-columns: 52px 1fr; gap: 12px; }
+    .upd :global(.upd-thumb) { width: 52px; height: 52px; }
+  }
+</style>

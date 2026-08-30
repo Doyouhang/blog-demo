@@ -1,8 +1,3 @@
 {
-  "updatedAt": "2026-08-26",
-  "items": [
-    { "icon": "book", "text": "在读《置身事内》" },
-    { "icon": "headphones", "text": "City Pop 循环中" },
-    { "icon": "camera", "text": "最近在拍老城区" }
-  ]
+  "items": []
 }
