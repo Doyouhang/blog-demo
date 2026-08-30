@@ -45,8 +45,19 @@ before(async () => {
   throw new Error('studio 15 秒内没起来');
 });
 
+// 这一组自己造的文件，跑完按**完整路径**删。
+// 不要现扫目录再按后缀筛 —— 那个目录里也有他自己的东西。
+const zz = [];
+const put = (rel, text) => {
+  const abs = path.join(ROOT, rel);
+  writeFileSync(abs, text);
+  zz.push(abs);
+  return abs;
+};
+
 after(() => {
   for (const id of created) rmSync(path.join(ROOT, 'src/content/moments', id), { recursive: true, force: true });
+  for (const abs of zz) rmSync(abs, { force: true });
   try { process.kill(-server.pid, 'SIGTERM'); } catch { /* 已退 */ }
 });
 
@@ -318,4 +329,64 @@ test('缩略图：上游说没了就报 404，不是 500', async () => {
     { headers: { origin: B } });
   assert.ok(r.status === 404 || r.status === 502, `拿到的是 ${r.status}`);
   assert.notEqual(r.status, 200);
+});
+
+// ——— 删除 ———
+//
+// 删除是唯一一个「点错了东西就没了」的操作。这一组盯的是它的三种坏账：
+// 删到仓库外面去、把封面图留成孤儿、删掉还被 reference() 指着的长文。
+
+test('删除：id 带路径片段的一律不认', async () => {
+  const canary = '/tmp/zz-studio-delete-canary.md';
+  writeFileSync(canary, 'x');
+  const r = await post('/api/delete', { type: 'sparks', id: '../../../../tmp/zz-studio-delete-canary' });
+  assert.notEqual(r.status, 200);
+  assert.ok(existsSync(canary), '不能删到仓库外面去');
+  rmSync(canary, { force: true });
+});
+
+test('删除：dryRun 只报清单，不动文件', async () => {
+  const f = put('src/content/sparks/zz-test-dry.md',
+    '---\ndate: "2026-08-30T09:00:00+08:00"\ndraft: true\n---\n\n测试\n');
+  const r = await post('/api/delete', { type: 'sparks', id: 'zz-test-dry', dryRun: true });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.deepEqual(r.data.files, ['src/content/sparks/zz-test-dry.md']);
+  assert.ok(existsSync(f), 'dryRun 不该真动文件');
+});
+
+test('删除收藏条目会把封面图一起带走', async () => {
+  // 只删 md 的话，封面就成了没人引用的孤儿图 —— 这个坑踩过一次，清了三张
+  const md = put('src/content/items/zz-test-item.md',
+    '---\nkind: book\ntitle: 测试条目\ncreator: 测试\ndate: "2026-08-30"\n' +
+    'cover: ./zz-test-item.jpg\nblurb: 测试\ndraft: true\n---\n\n测试\n');
+  const img = put('src/content/items/zz-test-item.jpg', 'not-a-real-jpeg');
+  const r = await post('/api/delete', { type: 'items', id: 'zz-test-item' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(!existsSync(md), 'md 该删掉');
+  assert.ok(!existsSync(img), '封面该跟着一起删');
+});
+
+test('删除被引用的长文会被拒绝，并说清楚是谁在引用', async () => {
+  // items.essay 是 reference('essays')。删掉被指着的那一篇，报错要等到
+  // 下一次构建才冒出来 —— 那时候人早就不在 studio 前面了
+  const essay = put('src/content/essays/zz-test-essay.md',
+    '---\ntitle: 测试长文\ndescription: 测试\npubDate: 2026-08-30\ndraft: true\n---\n\n正文\n');
+  put('src/content/items/zz-test-holder.md',
+    '---\nkind: book\ntitle: 测试引用方\ncreator: 测试\ndate: "2026-08-30"\n' +
+    'blurb: 测试\nessay: zz-test-essay\ndraft: true\n---\n\n测试\n');
+  const r = await post('/api/delete', { type: 'essays', id: 'zz-test-essay' });
+  assert.notEqual(r.status, 200);
+  assert.match(r.data.error ?? '', /测试引用方/, '错误里要点名是谁在引用');
+  assert.ok(existsSync(essay), '拒绝之后文件必须还在');
+});
+
+test('删除「此间」动态会清掉整个目录（照片在里面）', async () => {
+  const a = await post('/api/save', newMoment('测试删除地点', '待删的一条'));
+  created.push(a.data.id);
+  const dir = path.join(ROOT, 'src/content/moments', a.data.id);
+  writeFileSync(path.join(dir, 'zz-photo.jpg'), 'not-a-real-jpeg');
+  const r = await post('/api/delete', { type: 'moments', id: a.data.id });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(!existsSync(dir), '整个目录该没了');
+  assert.ok(r.data.removed.some((f) => f.endsWith('zz-photo.jpg')), '清单里要报上照片');
 });

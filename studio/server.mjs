@@ -260,6 +260,77 @@ async function removeSibling(type, slug, rel) {
   try { await rm(file); } catch { /* 已经不在了就算了 */ }
 }
 
+/**
+ * 删一条内容之前，先算清楚会连带删掉什么、以及会不会留下坏账。
+ *
+ * 三种坏账，各有各的拦法：
+ *  - 收藏条目的封面图和 md 同目录。只删 md 就攒下一张没人引用的孤儿图
+ *    （前阵子刚清过三张），所以要顺着 cover 字段一起带走。
+ *  - 「此间」一条动态是一个目录，照片在里面，得整个删。
+ *  - 长文可能被收藏条目的 essay 字段指着。reference() 让指向不存在的 slug
+ *    在**构建期**就报错 —— 那时候人已经不在 studio 前面了，所以这种删除
+ *    必须当场拒绝，并且说清楚是谁在引用。
+ *
+ * 只算不删：算出来的清单要先给人看过，确认了才真删。
+ */
+async function planDelete(typeKey, id) {
+  const t = TYPES[typeKey];
+  if (!t) throw new Error('未知类型：' + typeKey);
+  const slug = safeSegment(id);
+  if (!slug) throw new Error('条目 id 不合法：' + id);
+
+  if (typeKey === 'essays') {
+    const holders = (await listEntries('items'))
+      .filter((e) => String(e.front.essay ?? '') === slug)
+      .map((e) => e.front.title || e.id);
+    if (holders.length) {
+      throw new Error(
+        `删不了：${holders.join('、')} 的「关联长文」还指着这一篇。` +
+        '删掉的话下一次构建会直接报错。先去那一条里把内容切回「短评」，再回来删。'
+      );
+    }
+  }
+
+  const files = [];
+  let entryFile;
+  let dir = null;
+  if (t.flat) {
+    entryFile = assertInside(path.join(ROOT, t.dir, slug + '.md'), t.dir);
+    if (!existsSync(entryFile)) throw new Error('这一条已经不在了');
+    // 封面和 md 同目录，跟着一起走。名字来自 md 里的 ./xxx.jpg，
+    // 带路径分隔符的一律不认 —— 和 removeSibling 同一套规矩
+    const { front } = parsed(await readFile(entryFile, 'utf8'));
+    const cover = String(front.cover ?? '').replace(/^\.\//, '');
+    if (cover && !cover.includes('/') && !cover.includes('\\') && !cover.includes('\0')) {
+      const img = assertInside(path.join(ROOT, t.dir, cover), t.dir);
+      if (existsSync(img)) files.push(img);
+    }
+    files.push(entryFile);
+  } else {
+    dir = assertInside(path.join(ROOT, t.dir, slug), t.dir);
+    // rm -r 的爆炸半径值得多一道显式判断：slug 万一收敛成空，
+    // 拼出来的就是内容根目录本身
+    if (dir === path.resolve(ROOT, t.dir)) throw new Error('拒绝删除内容根目录');
+    if (!existsSync(dir)) throw new Error('这一条已经不在了');
+    entryFile = path.join(dir, t.entry);
+    for (const n of await readdir(dir)) files.push(path.join(dir, n));
+  }
+
+  // 没提交过的，删了 git 也救不回来 —— 这一点得让人在按确定之前看见
+  let committed = false;
+  try {
+    await git('ls-files', '--error-unmatch', '--', path.relative(ROOT, entryFile));
+    committed = true;
+  } catch { /* 没被 git 跟踪 */ }
+
+  return {
+    slug,
+    dir: dir ? path.relative(ROOT, dir) : null,
+    files: files.map((f) => path.relative(ROOT, f)),
+    committed,
+  };
+}
+
 // ——— 路由 ———
 
 const routes = {
@@ -302,6 +373,23 @@ const routes = {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, buildMarkdown(front, bodyText), 'utf8');
     return { ok: true, id: slug, file: path.relative(ROOT, file), noteId };
+  },
+
+  // 两步式：先 dryRun 拿到「会删掉哪几个文件、提交过没有」，客户端拿它填确认框，
+  // 确认了再发一次真删。清单由服务端算，确认框上写的就是真会发生的事 ——
+  // 「确定删除吗？」这种问法等于没问。
+  'POST /api/delete': async (body) => {
+    const { type, id, dryRun } = JSON.parse(body);
+    const plan = await planDelete(type, id);
+    if (dryRun) return { ok: true, ...plan };
+    if (plan.dir) {
+      await rm(assertInside(path.join(ROOT, plan.dir), TYPES[type].dir), { recursive: true, force: true });
+    } else {
+      for (const rel of plan.files) {
+        await rm(assertInside(path.join(ROOT, rel), TYPES[type].dir), { force: true });
+      }
+    }
+    return { ok: true, removed: plan.files };
   },
 
   'POST /api/upload': async (body, url) => {

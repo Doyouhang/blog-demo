@@ -9,12 +9,12 @@
   :root {
     --bg: #fdfdfd; --panel: #fff; --fg: #1f2328; --muted: #65707a;
     --border: #e6e8eb; --accent: #2f6df0; --accent-weak: #eef3ff;
-    --ok: #16a34a; --warn-bg: #fff7ed; --warn-fg: #9a3412; --warn-border: #fed7aa;
+    --ok: #16a34a; --danger: #dc2626; --warn-bg: #fff7ed; --warn-fg: #9a3412; --warn-border: #fed7aa;
     --radius: 10px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1216; --panel: #161a20; --fg: #e4e8ee; --muted: #98a3b0;
+      --bg: #0f1216; --panel: #161a20; --fg: #e4e8ee; --muted: #98a3b0; --danger: #f87171;
       --border: #262c34; --accent: #6ea8ff; --accent-weak: #17243a;
       --warn-bg: #2a1d10; --warn-fg: #fdba74; --warn-border: #7c4a1a;
     }
@@ -134,7 +134,18 @@
          white-space: pre-wrap; max-height: 140px; overflow: auto; }
   .log b { color: var(--fg); }
   .log .ok { color: var(--ok); }
-  .log .err { color: #dc2626; }
+  .log .err { color: var(--danger); }
+  /* 危险操作和保存离远一点，也不做成实心按钮 —— 别让它长得像个该点的东西 */
+  .danger {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border);
+  }
+  .danger button {
+    padding: 6px 14px; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer;
+    background: none; border: 1px solid var(--danger); color: var(--danger);
+  }
+  .danger button:hover { background: var(--danger); color: #fff; }
+  .danger span { color: var(--muted); font-size: 12px; }
   .empty { color: var(--muted); padding: 40px 0; }
 </style>
 </head>
@@ -341,7 +352,15 @@ function renderForm() {
     ${t.bodyLabel ? `<label class="f"><span>${t.bodyLabel}${t.bodyRequired ? ' <span class="req">*</span>' : ''}</span>
       <textarea data-body="1" rows="${cur.type === 'essays' ? 16 : 4}">${escapeHtml(cur.body)}</textarea></label>` : ''}
     ${field({ key: 'draft', label: '存为草稿（线上不显示）', type: 'bool' })}
+    ${cur.id ? `<div class="danger">
+      <button type="button" id="btn-delete">删除这一条</button>
+      <span>封面 / 照片会一起删掉</span>
+    </div>` : ''}
   </div>`;
+
+  // innerHTML 刚换过，每次都要重新挂
+  const del = $('#btn-delete');
+  if (del) del.onclick = () => remove().catch((e) => log(e.message, 'err'));
 
   $('#form').oninput = (e) => {
     const el = e.target;
@@ -598,6 +617,29 @@ async function save({ silent } = {}) {
   }
   await refresh();
   return r;
+}
+
+// 删除走两步：先问服务端这一条会连带删掉哪几个文件，把真实清单摆进确认框，
+// 确认了再发第二次真删。「确定要删除吗？」这种确认框等于没有 ——
+// 得让人看见具体是哪几个文件，以及删了还找不找得回来。
+async function remove() {
+  if (!cur.id) return;
+  const payload = { type: cur.type, id: cur.id };
+  const opts = (extra) => ({
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...payload, ...extra }),
+  });
+  const plan = await api('/api/delete', opts({ dryRun: true }));
+  const lines = plan.files.map((f) => '  · ' + f).join('\n');
+  const fate = plan.committed
+    ? '这一条提交过，删错了还能用 git 找回来。'
+    : '⚠ 这一条还没提交过 —— 删了 git 也救不回来。';
+  if (!confirm(`要删掉这 ${plan.files.length} 个文件：\n\n${lines}\n\n${fate}`)) return;
+
+  const r = await api('/api/delete', opts({}));
+  r.removed.forEach((f) => log('已删除 ' + f, 'ok'));
+  newEntry();
+  await refresh();
 }
 
 async function refresh() {
