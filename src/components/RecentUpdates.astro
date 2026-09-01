@@ -4,8 +4,6 @@
 // 原来这块只放长文 —— 于是首页只有在写长文的时候才会动，而长文恰恰是
 // 最不常写的那种。合流之后，加一条闪念、换一张封面、发一组照片，首页都会变。
 import { Image } from 'astro:assets';
-import Icon from './Icon.astro';
-import type { IconName } from './icons';
 import { getCollection } from 'astro:content';
 import { cstISODate } from '../utils/cst';
 
@@ -23,53 +21,66 @@ const [essays, items, moments, sparks] = await Promise.all([
   getCollection('sparks', ({ data }) => !data.draft),
 ]);
 
+// 被收藏条目关联的长文不再单独占一行。《奥德赛》和它的观后感《文明的归家路》
+// 是同一件事 —— 同一天、同一句摘要，并排出现纯属重复。保留条目那一行：
+// 它有封面，也更接近"我看了什么"这个事实。
+const linked = new Set(
+  items.map((i) => i.data.essay?.id).filter((id): id is string => !!id)
+);
+
+/** 截到 max 个字，超了补省略号 */
+const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) + '…' : s);
+
 /**
- * 正文开头，截短了当标题用（闪念和动态都没有 title）。
- * 换行一律折成空格 —— 只取第一行的话，像影评那种起手一个短句
- * 「"如果，」就成了整条摘要，看着像坏了。
+ * 一段正文拆成「首行 + 其余」。
+ *
+ * 闪念和动态都没有 title，正文既当标题又当摘要。原来整段折成一行塞进标题里，
+ * 而标题是 nowrap 的 —— 换行之后的内容会被省略号整个吃掉，看起来就像丢了。
  */
-function lead(text: string, max = 42): string {
-  const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
-  return flat.length > max ? flat.slice(0, max) + '…' : flat;
+function split(text: string, headMax = 40, tailMax = 52): [string, string] {
+  const lines = String(text ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  return [clip(lines[0] ?? '', headMax), clip(lines.slice(1).join('  '), tailMax)];
 }
 
+/** 单段文字压成一行（收藏的短评可能有换行，摘要位置不需要保留） */
+const flat = (s: string, max = 52) => clip(String(s ?? '').replace(/\s+/g, ' ').trim(), max);
+
 const KIND = {
-  book: { label: '读书', page: 'reading', icon: 'book' as IconName },
-  movie: { label: '影视', page: 'watching', icon: 'play' as IconName },
-  song: { label: '音乐', page: 'music', icon: 'headphones' as IconName },
-};
-// 长文按归属给图标，比统一给一个"文章"图标有信息量
-const TOPIC_ICON: Record<string, IconName> = {
-  blog: 'compass', reading: 'book', music: 'headphones',
-  watching: 'play', cooking: 'pot', coding: 'code',
+  book: { label: '读书', page: 'reading', seal: '书' },
+  movie: { label: '影视', page: 'watching', seal: '影' },
+  song: { label: '音乐', page: 'music', seal: '音' },
 };
 
 interface Row {
   date: Date; label: string; title: string; note?: string;
-  href: string; icon: IconName; cover?: ImageMetadata;
+  href: string; seal: string; cover?: ImageMetadata;
 }
 
 const rows: Row[] = [
-  ...essays.map((e) => ({
-    date: e.data.pubDate, label: '长文', title: e.data.title,
-    note: e.data.description, href: `${B}blog/${e.id}/`,
-    icon: TOPIC_ICON[e.data.topic] ?? 'compass',
-  })),
+  ...essays
+    .filter((e) => !linked.has(e.id))
+    .map((e) => ({
+      date: e.data.pubDate, label: '长文', title: e.data.title,
+      note: flat(e.data.description), href: `${B}blog/${e.id}/`, seal: '文',
+    })),
   ...items.map((i) => ({
     date: i.data.date, label: KIND[i.data.kind].label,
     title: i.data.kind === 'song' ? i.data.title : `《${i.data.title}》`,
-    note: lead(i.data.blurb), href: `${B}interests/${KIND[i.data.kind].page}/`,
-    icon: KIND[i.data.kind].icon, cover: i.data.cover,
+    note: flat(i.data.blurb), href: `${B}interests/${KIND[i.data.kind].page}/`,
+    seal: KIND[i.data.kind].seal, cover: i.data.cover,
   })),
-  ...moments.map((m) => ({
-    date: m.data.date, label: '此间', title: m.data.place ?? '随手拍',
-    note: lead(m.body ?? ''), href: `${B}moments/`,
-    icon: 'camera' as IconName, cover: m.data.photos[0]?.src,
-  })),
-  ...sparks.map((s) => ({
-    date: s.data.date, label: '闪念', title: lead(s.body ?? '', 52),
-    href: `${B}sparks/`, icon: 'bulb' as IconName,
-  })),
+  ...moments.map((m) => {
+    const [head, tail] = split(m.body ?? '');
+    return {
+      date: m.data.date, label: '此间', title: m.data.place ?? (head || '随手拍'),
+      note: m.data.place ? head : tail, href: `${B}moments/`,
+      seal: '摄', cover: m.data.photos[0]?.src,
+    };
+  }),
+  ...sparks.map((s) => {
+    const [head, tail] = split(s.body ?? '', 44);
+    return { date: s.data.date, label: '闪念', title: head, note: tail, href: `${B}sparks/`, seal: '念' };
+  }),
 ]
   .sort((a, b) => b.date.valueOf() - a.date.valueOf())
   .slice(0, limit);
@@ -80,7 +91,9 @@ const rows: Row[] = [
       {r.cover ? (
         <Image class="upd-thumb" src={r.cover} alt="" width={132} />
       ) : (
-        <span class="upd-thumb upd-blank"><Icon name={r.icon} size={24} /></span>
+        /* 没有封面的那些不留一个空框配小图标，改成一枚字印 ——
+           和站名那枚朱红「迩」是同一套语言，安静但不空 */
+        <span class="upd-thumb upd-seal" aria-hidden="true">{r.seal}</span>
       )}
       <span class="upd-body">
         <span class="upd-hd">
@@ -107,12 +120,16 @@ const rows: Row[] = [
   /* 封面比例各不相同（书是竖的、歌是方的），统一裁进一个固定的框，
      一排扫下来标题才在同一条竖线上 */
   .upd :global(.upd-thumb) {
-    width: 66px; height: 66px; border-radius: 10px; display: block;
+    width: 66px; height: 66px; border-radius: var(--radius); display: block;
     object-fit: cover; background: var(--bg-soft); border: 1px solid var(--border);
   }
-  .upd-blank {
-    display: flex; align-items: center; justify-content: center; color: var(--seal);
+  .upd-seal {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 27px; line-height: 1;
+    color: var(--muted); letter-spacing: 0;
+    transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
   }
+  .upd:hover .upd-seal { color: var(--accent); border-color: var(--accent-line); }
 
   .upd-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .upd-hd {
@@ -120,9 +137,8 @@ const rows: Row[] = [
     font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
   }
   .upd-tag {
-    color: var(--accent); background: transparent;
-    border: 1px solid var(--accent-line);
-    border-radius: 3px; padding: 1px 8px; font-size: 11px; letter-spacing: 0.08em;
+    color: var(--accent); background: var(--accent-weak);
+    border-radius: 999px; padding: 1px 9px; font-size: 11px;
   }
   .upd b {
     font-size: 15px; font-weight: 600;
@@ -137,5 +153,6 @@ const rows: Row[] = [
   @media (max-width: 720px) {
     .upd { grid-template-columns: 52px 1fr; gap: 12px; }
     .upd :global(.upd-thumb) { width: 52px; height: 52px; }
+    .upd-seal { font-size: 22px; }
   }
 </style>

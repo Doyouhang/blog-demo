@@ -51,6 +51,23 @@ ok('首页最近更新是混流', updKinds.length >= 3, updKinds.join('/'));
 const homeImgs = await page.evaluate(() =>
   [...document.querySelectorAll('img')].filter((i) => i.naturalWidth > 0).length);
 ok('首页有真图（封面 / 照片）', homeImgs >= 3, homeImgs + ' 张');
+// 收藏条目关联的长文不该再单独占一行 —— 《奥德赛》和它的观后感是同一件事，
+// 并排出现时连摘要都一模一样。这里用「摘要不重复」当代理，因为页面上看不到关联关系。
+const updNotes = await page.evaluate(() =>
+  [...document.querySelectorAll('.upd-note')].map((e) => e.textContent.trim()).filter(Boolean));
+ok('最近更新里没有同一条内容出现两次', new Set(updNotes).size === updNotes.length,
+  updNotes.length + ' 条摘要');
+// 没有封面的那些用字印占位。原来是一个空框配 24px 小图标，很空
+const seals = await page.evaluate(() =>
+  [...document.querySelectorAll('.upd-seal')].map((e) => e.textContent.trim()));
+ok('无封面的条目用字印占位', seals.length > 0 && seals.every((t) => t.length === 1), seals.join(''));
+// 闪念正文换行之后的部分要出得来：标题是 nowrap 单行，整段塞进去会被省略号吃掉
+const sparkRow = await page.evaluate(() => {
+  const row = [...document.querySelectorAll('.upd')].find(
+    (r) => r.querySelector('.upd-tag')?.textContent.trim() === '闪念' && r.querySelector('.upd-note'));
+  return row ? row.querySelector('.upd-note').textContent.trim() : null;
+});
+ok('多行闪念的第二行会显示在摘要位', sparkRow !== null, sparkRow ?? '（没有多行闪念，跳过判定）');
 // 「此刻」不再手写：在读的书由 status=doing 算出来，不会停在某个日期上
 const nowText = await page.evaluate(() => document.querySelector('.side-box')?.textContent ?? '');
 ok('「此刻」从收藏里算出来', /在读|在看|最近在听|最近拍于/.test(nowText), nowText.slice(0, 40));

@@ -9,13 +9,14 @@ import { interests } from '../data/interests';
 import { AUTHOR } from '../consts';
 import nowData from '../data/now.json';
 import stockData from '../data/stocks.json';
-import { cstISODate } from '../utils/cst';
+import { cstISODate, cstYear } from '../utils/cst';
 
 const B = import.meta.env.BASE_URL;
 
-const [rawItems, rawMoments] = await Promise.all([
+const [rawItems, rawMoments, sparks] = await Promise.all([
   getCollection('items', ({ data }) => !data.draft),
   getCollection('moments', ({ data }) => !data.draft),
+  getCollection('sparks', ({ data }) => !data.draft),
 ]);
 const byNewest = (a: { data: { date: Date } }, b: { data: { date: Date } }) =>
   b.data.date.valueOf() - a.data.date.valueOf();
@@ -39,17 +40,41 @@ const latestOf = (slug: string) => {
 // 「此刻」：能从内容里算出来的就不要手写 —— 手写的迟早停在某个日期上。
 // now.json 留给算不出来的（在忙什么、在学什么），会接在自动那几条后面。
 interface NowItem { icon: IconName; text: string }
-const nowRows: NowItem[] = [];
-const readingNow = items.find((i) => i.data.kind === 'book' && i.data.status === 'doing');
-if (readingNow) nowRows.push({ icon: 'book', text: `在读《${readingNow.data.title}》` });
-const watchingNow = items.find((i) => i.data.kind === 'movie' && i.data.status === 'doing');
-if (watchingNow) nowRows.push({ icon: 'play', text: `在看《${watchingNow.data.title}》` });
+const pick = (kind: string, status: string) =>
+  items.find((i) => i.data.kind === kind && i.data.status === status);
+// 手头没有在读 / 在看的时候，退到最近读完看完的那本 ——
+// 这一行整个消失比说"刚读完"更糟，读者会以为这个人什么都没干
+const book = pick('book', 'doing') ?? pick('book', 'done');
+const movie = pick('movie', 'doing') ?? pick('movie', 'done');
 const lastSong = items.find((i) => i.data.kind === 'song');
+const shelf = items.filter((i) => i.data.kind === 'book').length;
+const reel = items.filter((i) => i.data.kind === 'movie').length;
+const sparkYears = sparks.map((s) => cstYear(s.data.date));
+const sinceYear = sparkYears.length ? Math.min(...sparkYears) : null;
+
+const nowRows: NowItem[] = [];
+if (book) nowRows.push({
+  icon: 'book',
+  text: `${book.data.status === 'doing' ? '在读' : '刚读完'}《${book.data.title}》`,
+});
+if (movie) nowRows.push({
+  icon: 'play',
+  text: `${movie.data.status === 'doing' ? '在看' : '刚看完'}《${movie.data.title}》`,
+});
 if (lastSong) nowRows.push({ icon: 'headphones', text: `最近在听 ${lastSong.data.title}` });
 if (heroMoment?.data.place) nowRows.push({ icon: 'camera', text: `最近拍于 ${heroMoment.data.place}` });
+// 攒下来的量。上面那几条讲"最近"，这两条讲"到现在为止"——
+// 一阵子没更新的时候，它们不会跟着一起空掉
+if (shelf || reel) nowRows.push({ icon: 'compass', text: `书架 ${shelf} 本 · 片单 ${reel} 部` });
+if (sparks.length) nowRows.push({
+  icon: 'bulb',
+  text: sinceYear ? `攒了 ${sparks.length} 条闪念，最早一条在 ${sinceYear} 年` : `攒了 ${sparks.length} 条闪念`,
+});
+// now.json 留给自动算不出来的，接在后面
 nowRows.push(...((nowData as { items?: NowItem[] }).items ?? []));
+
 // 「更新于」跟着最新的那条内容走，不再是手填的日期
-const nowAt = [readingNow, watchingNow, lastSong, heroMoment]
+const nowAt = [book, movie, lastSong, heroMoment]
   .filter((e): e is NonNullable<typeof e> => !!e)
   .map((e) => e.data.date.valueOf())
   .sort((a, b) => b - a)[0];
@@ -68,25 +93,21 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
       <div class="avatar" aria-hidden="true">迩</div>
       <div class="intro-text">
         <h1>你好，我是{AUTHOR}</h1>
-        <p>白天写代码，晚上折腾些没用但有趣的东西。</p>
+        <p>白天当牛马，晚上折腾些没用但有趣的东西。</p>
       </div>
       <div class="intro-links">
         <a href="https://github.com/Doyouhang"><Icon name="github" size={16} />GitHub</a>
       </div>
-      {heroPhoto && (
-        <a class="intro-shot" href={`${B}moments/`} title={heroMoment.data.place ?? '此间'}>
-          <Image src={heroPhoto.src} alt={heroPhoto.alt} width={264} />
-        </a>
-      )}
     </section>
 
     <div class="split">
       <div class="split-main">
         <div class="sec-hd">
-          <h2>最近更新</h2>
-          <span class="sec-note">长文、书影音、随手拍和闪念都算</span>
+          <h2>最近更新</h2>         
         </div>
-        <RecentUpdates limit={6} />
+        <!-- 八条不是随便定的：右栏是「此刻 + 自选股 + 最近一张照片」三块，
+             六条时左边短一截，八条正好和它齐平 -->
+        <RecentUpdates limit={8} />
       </div>
 
       <aside>
@@ -123,6 +144,17 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
               {rows.length} 只自选 · <a href={`${B}interests/stocks/`}>看全部 →</a>
             </p>
           </section>
+        )}
+
+        {heroPhoto && (
+          <a class="side-shot" href={`${B}moments/`}>
+            <Image src={heroPhoto.src} alt={heroPhoto.alt} width={620} />
+            <span class="side-shot-cap">
+              <Icon name="camera" size={14} />
+              <span class="where">{heroMoment.data.place ?? '此间'}</span>
+              <span class="go">→</span>
+            </span>
+          </a>
         )}
       </aside>
     </div>
@@ -163,14 +195,25 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
 </BaseLayout>
 
 <style>
-  /* 首屏右边那张照片：不做成大背景，就是一个能点进时间线的窗口 */
-  .intro-shot {
-    flex-shrink: 0; width: 132px; height: 88px; border-radius: 12px;
-    overflow: hidden; border: 1px solid var(--border); line-height: 0;
+  /* 最近一张照片，放在右栏最底下。左栏六条比右边两个盒子高出一截，
+     这张图正好把差补上；而且放在这儿它是「此间」的入口，
+     比挤在名字旁边当装饰更有用 */
+  .side-shot {
+    display: block; border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; background: var(--card); color: inherit;
     transition: border-color var(--dur-fast) var(--ease);
   }
-  .intro-shot:hover { border-color: var(--accent); }
-  .intro-shot :global(img) { width: 100%; height: 100%; object-fit: cover; }
+  .side-shot:hover { border-color: var(--accent); text-decoration: none; }
+  .side-shot :global(img) {
+    display: block; width: 100%; height: 168px; object-fit: cover;
+  }
+  .side-shot-cap {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; font-size: 13px; color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+  .side-shot-cap .where { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-shot:hover .side-shot-cap { color: var(--accent); }
 
   /* 封面高矮胖瘦各不相同，装进一个等高的框里，六个格子才齐 */
   .int-shelf {
@@ -193,7 +236,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
   }
 
   @media (max-width: 760px) {
-    .intro-shot { width: 100%; height: 120px; }
+    .side-shot :global(img) { height: 140px; }
     .int-shelf { height: 76px; }
     .int-shelf :global(img) { max-height: 66px; }
   }
