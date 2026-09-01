@@ -6,25 +6,58 @@ import Icon from '../components/Icon.astro';
 // 暂不公开邮箱：留空时下面那一行不渲染，页面不会有占位符残留。
 // 想放出来就填进来；介意被爬虫收走的话可以写成 "迩迩 [at] example [dot] com" 这种形式。
 const EMAIL = '';
+const B = import.meta.env.BASE_URL;
 ---
-<BaseLayout title="关于" description="关于我，以及这个站是怎么搭的" fullWidth>
+<BaseLayout title="关于" description="关于我，以及这个站是什么、怎么搭的" fullWidth>
   <div class="container-wide">
-    <PageHeader eyebrow="关于" title="关于我" lead="白天写代码，晚上折腾些没用但有趣的东西。" />
+    <PageHeader
+      eyebrow="关于"
+      title="关于我"
+      lead="读过的书、看过的片、走过的路，以及一些一闪而过的念头。"
+    />
     <div class="split">
       <div class="split-main prose">
         <p>
-          你好，我是迩迩，一个喜欢折腾技术和记录生活的人。这个站放我的博客和几个兴趣，
-          与其写一段"我喜欢读书"，不如把读过的书和当时的想法摆出来。日常拍的照片记在时间线里，几个小玩具收在各页底部。
+          我是迩迩，一名软件工程师。这个站是我给自己留的一份档案。
         </p>
+        <p>
+          起念很简单：读过的书、看过的片、走过的路，当时都想过些什么，不写下来就会散掉。
+          与其写一句「我喜欢读书」，不如把读过的书和当时的想法一并摆出来 ——
+          记录学习的过程，梳理自己的想法，顺便练一练怎么把话说清楚。
+        </p>
+
+        <h2>这里有什么</h2>
+        <p>
+          <a href={`${B}blog/`}>博客</a>放值得展开讲的东西，一篇是一篇。
+          <a href={`${B}sparks/`}>闪念</a>放撑不起标题的那些 —— 一句话、一个念头，按时间排，
+          最早的一条停在 2023 年。
+          <a href={`${B}moments/`}>此间</a>是出门随手拍的照片，配一段话，
+          连快门光圈一起存着。
+          <a href={`${B}interests/`}>兴趣</a>是书架、片单和歌单，另外还有股票、代码、下厨
+          这几件仍在琢磨的事。
+        </p>
+
         <h2>这个站是怎么搭的</h2>
         <p>
-          用 <a href="https://astro.build">Astro</a> 写的静态站，源码在 GitHub，通过 GitHub Pages 免费上线。
-          没有后端、没有数据库，所有页面在构建时就生成好了。
+          <a href="https://astro.build">Astro</a> 写的静态站，源码放在 GitHub，
+          由 GitHub Actions 构建后发布到 GitHub Pages。没有服务器，没有数据库，
+          所有页面在构建时就已经生成好了。
         </p>
         <p>
-          股票页的行情是构建时抓的：每次部署前跑一个脚本拉一次数据写进仓库，
-          再由 GitHub Actions 在交易日收盘后定时重新构建。所以页面上是延迟数据，但完全不需要服务器。
+          内容不写在代码里。书影音、照片、闪念都是各自独立的 Markdown 文件，
+          由一个只在本机运行的编辑器来写 —— 它负责压缩图片、读出照片自带的拍摄参数、
+          按名字检索封面，也管提交和发布。
         </p>
+        <p>
+          股票页的行情是构建时抓的：交易日收盘之后，Actions 定时把数据拉一次写进仓库，
+          再重新生成页面。所以看到的是延迟数据，但一台服务器都不需要。
+        </p>
+        <p>
+          搭这个站踩过的坑，都记在
+          <a href={`${B}blog/astro-github-pages/`}>《用 Astro + GitHub Pages 免费建站》</a>里了。
+        </p>
+
+        <blockquote>慢慢来，比较快。</blockquote>
       </div>
       <aside>
         <section class="side-box">
@@ -45,6 +78,10 @@ const EMAIL = '';
           <div class="side-row"><span>框架</span><span class="side-val">Astro</span></div>
           <div class="side-row"><span>托管</span><span class="side-val">GitHub Pages</span></div>
           <div class="side-row"><span>主题</span><span class="side-val">跟随系统，可切换</span></div>
+          <div class="side-row">
+            <span>源码</span>
+            <span class="side-val"><a href="https://github.com/Doyouhang/blog-demo">blog-demo</a></span>
+          </div>
           <p class="side-foot">静态生成，无后端、无追踪脚本。</p>
         </section>
       </aside>
