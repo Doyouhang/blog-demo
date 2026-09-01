@@ -117,7 +117,12 @@ test('Host 不匹配被拒绝（挡 DNS 重绑定）', async () => {
 });
 
 test('/media/ 不把 .md 当图片吐出去', async () => {
-  const r = await fetch(B + '/media/essays/welcome.md', { headers: { origin: B } });
+  // 探针必须指着一个**确实存在**的文件。原来指的是脚手架自带的 welcome.md，
+  // 那篇一删，这条就退化成「404 是因为文件不在」—— 就算 /media/ 真把 md
+  // 吐出去了，它也照样绿。所以自己造一个再问。
+  put('src/content/essays/zz-media-probe.md',
+    '---\ntitle: 探针\ndescription: x\npubDate: 2026-09-01\ndraft: true\n---\n\n不该被 /media/ 吐出去\n');
+  const r = await fetch(B + '/media/essays/zz-media-probe.md', { headers: { origin: B } });
   assert.equal(r.status, 404);
 });
 

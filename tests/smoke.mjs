@@ -64,16 +64,24 @@ ok('跨页转场走客户端导航（无整页刷新）', noReload);
 
 // 3. 客户端导航进 demo 页后，脚本仍然初始化（astro:page-load）
 await page.click(`a[href="${at('/interests/music/')}"]`);
-// 换页后脚本要重新加载执行，这里断言它在 100ms 内就绪（实测约 30ms，人眼无感）。
-// 钢琴现在收在折叠彩蛋里，但 data-ready 不该依赖折叠状态 —— 脚本进页面就跑，
-// 不等 details 打开。所以用 attached 而不是默认的 visible，否则测的是「我点得多快」。
+// 换页后脚本要重新加载执行。钢琴收在折叠彩蛋里，但 data-ready 不该依赖折叠状态 ——
+// 脚本进页面就跑，不等 details 打开。所以用 attached 而不是默认的 visible，
+// 否则测的是「我点得多快」。
+//
+// 这里原来用一个 100ms 的墙钟预算来代言那件事（当时实测约 30ms，余量很足）。
+// 换主题多了几套字体之后余量没了，它开始在 98~110ms 之间反复横跳 ——
+// 那时候它测的已经是机器负载，不是那个不变量了。所以把两件事拆开：
+// 超时放宽到能抓住「astro:page-load 根本没触发」，不变量单独断言。
 let readyMs = -1;
 try {
   const t0 = Date.now();
-  await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 100, state: 'attached' });
+  await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 5000, state: 'attached' });
   readyMs = Date.now() - t0;
 } catch { /* 超时则保持 -1 */ }
-ok('换页后 demo 在 100ms 内完成初始化（不依赖彩蛋是否展开）', readyMs >= 0, readyMs >= 0 ? readyMs + 'ms' : '超过 100ms');
+ok('换页后 demo 会重新初始化', readyMs >= 0, readyMs >= 0 ? readyMs + 'ms' : '5 秒内都没就绪');
+const foldStillClosed = await page.evaluate(() =>
+  ![...document.querySelectorAll('details')].some((d) => d.open));
+ok('demo 初始化不等彩蛋展开', foldStillClosed);
 // 交互测试要真能点到，这时才展开
 await page.click('details.lab summary');
 await waitInteractive(page, '.piano-keys .key.white');
