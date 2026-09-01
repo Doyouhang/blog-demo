@@ -45,6 +45,37 @@ function split(text: string, headMax = 40, tailMax = 52): [string, string] {
 /** 单段文字压成一行（收藏的短评可能有换行，摘要位置不需要保留） */
 const flat = (s: string, max = 52) => clip(String(s ?? '').replace(/\s+/g, ' ').trim(), max);
 
+/**
+ * 没有封面的只可能是长文和闪念 —— 这两类天生没有 cover 字段。
+ * （收藏和此间理论上也可能缺图，退回长文那枚。）
+ *
+ * 两枚共用同一套语言：墨线打底 + 一点朱红，圆头圆角，24 格。
+ * icons 规则库里那条「同一个界面只保留一个视觉族」说的就是这件事。
+ *
+ * 试废过四种：卷轴（读成杠铃）、竖排三竖（读成条码）、朱笔圈点和偏心墨晕
+ * （都读成加载转圈）、引号（这个尺寸下散成两个方块）。
+ * 32px 上留得住的只有明确的整体轮廓，细节全是噪音。
+ */
+const MARKS = {
+  // 长文 · 摊开的书，右页一枚朱红藏书印
+  essay: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 7.4C10 5.9 7.6 5.2 4.8 5.2H3.4v12.4h1.4c2.8 0 5.2.7 7.2 2.2"/>
+      <path d="M12 7.4c2-1.5 4.4-2.2 7.2-2.2h1.4v12.4h-1.4c-2.8 0-5.2.7-7.2 2.2"/>
+      <path d="M12 7.4v12.4"/>
+      <circle cx="17.4" cy="14.4" r="1.05" fill="var(--seal)" stroke="none"/>
+    </svg>`,
+  // 闪念 · 一笔朱砂，起笔处落一个墨点
+  spark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+      stroke-linecap="round" stroke-linejoin="round">
+      <g transform="translate(0.4 -1.1)">
+        <path d="M8.4 17.4c1.4-6.6 4-10.2 7.8-10.8" stroke="var(--seal)" stroke-width="2.4"/>
+        <circle cx="7.5" cy="19.4" r="1.35" fill="currentColor" stroke="none"/>
+      </g>
+    </svg>`,
+};
+type MarkName = keyof typeof MARKS;
+
 const KIND = {
   book: { label: '读书', page: 'reading' },
   movie: { label: '影视', page: 'watching' },
@@ -54,6 +85,8 @@ const KIND = {
 interface Row {
   date: Date; label: string; title: string; note?: string;
   href: string; cover?: ImageMetadata;
+  /** 没有封面时显示哪一枚标记 */
+  mark: MarkName;
 }
 
 const rows: Row[] = [
@@ -61,25 +94,28 @@ const rows: Row[] = [
     .filter((e) => !linked.has(e.id))
     .map((e) => ({
       date: e.data.pubDate, label: '长文', title: e.data.title,
-      note: flat(e.data.description), href: `${B}blog/${e.id}/`,
+      note: flat(e.data.description), href: `${B}blog/${e.id}/`, mark: 'essay' as MarkName,
     })),
   ...items.map((i) => ({
     date: i.data.date, label: KIND[i.data.kind].label,
     title: i.data.kind === 'song' ? i.data.title : `《${i.data.title}》`,
     note: flat(i.data.blurb), href: `${B}interests/${KIND[i.data.kind].page}/`,
-    cover: i.data.cover,
+    cover: i.data.cover, mark: 'essay' as MarkName,
   })),
   ...moments.map((m) => {
     const [head, tail] = split(m.body ?? '');
     return {
       date: m.data.date, label: '此间', title: m.data.place ?? (head || '随手拍'),
       note: m.data.place ? head : tail, href: `${B}moments/`,
-      cover: m.data.photos[0]?.src,
+      cover: m.data.photos[0]?.src, mark: 'essay' as MarkName,
     };
   }),
   ...sparks.map((s) => {
     const [head, tail] = split(s.body ?? '', 44);
-    return { date: s.data.date, label: '闪念', title: head, note: tail, href: `${B}sparks/` };
+    return {
+      date: s.data.date, label: '闪念', title: head, note: tail,
+      href: `${B}sparks/`, mark: 'spark' as MarkName,
+    };
   }),
 ]
   .sort((a, b) => b.date.valueOf() - a.date.valueOf())
@@ -91,12 +127,9 @@ const rows: Row[] = [
       {r.cover ? (
         <Image class="upd-thumb" src={r.cover} alt="" width={132} />
       ) : (
-        /* 没有封面的那一格：稿纸。
-           它必须**不带任何信息** —— 类型已经写在旁边的标签上了，方块里再放
-           一个字（试过「文」「念」）就是重复，而重复的装饰只会变成噪音。
-           所以这里只有纹理，aria-hidden，它唯一的职责是让这一行不空、
-           并且让所有标题落在同一条竖线上。 */
-        <span class="upd-thumb upd-paper" aria-hidden="true"></span>
+        /* 没有封面的那一格：长文和闪念各有一枚固定标记。
+           aria-hidden —— 类型已经写在旁边的标签上，读屏再念一遍纯属干扰。 */
+        <span class="upd-thumb upd-mark" aria-hidden="true" set:html={MARKS[r.mark]} />
       )}
       <span class="upd-body">
         <span class="upd-hd">
@@ -129,29 +162,13 @@ const rows: Row[] = [
     width: 66px; height: 66px; border-radius: var(--radius); display: block;
     object-fit: cover; background-color: var(--bg-soft); border: 1px solid var(--border);
   }
-  /* 一页信笺：横格 + 左边那道朱红栏线。
-     选它而不是格子或者空框，是因为它语义正好 —— 没有封面的就是长文和闪念，
-     本来就是「一页写着字的纸」。而且它有块面感，和旁边有封面的行节奏是齐的。 */
-  .upd-paper {
-    position: relative;
-    /* 两行 background-image 是一对：老浏览器解析不了 color-mix 会退回上一行，
-       只剩纸色，不会整块塌掉 */
-    background-image:
-      repeating-linear-gradient(to bottom, transparent 0 13px, var(--border) 13px 14px);
-    background-image:
-      repeating-linear-gradient(to bottom, transparent 0 13px,
-        color-mix(in srgb, var(--muted) 26%, transparent) 13px 14px);
-    background-position: 0 6px;
-    transition: border-color var(--dur-fast) var(--ease);
+  .upd-mark {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); opacity: 0.85;
+    transition: opacity var(--dur) var(--ease), border-color var(--dur-fast) var(--ease);
   }
-  /* 栏线。朱红是全站唯一的点缀色，这里只给一丝 */
-  .upd-paper::after {
-    content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 1px;
-    background: var(--seal); opacity: 0.5;
-    transition: opacity var(--dur) var(--ease);
-  }
-  .upd:hover .upd-paper { border-color: var(--accent-line); }
-  .upd:hover .upd-paper::after { opacity: 0.85; }
+  .upd-mark :global(svg) { width: 32px; height: 32px; }
+  .upd:hover .upd-mark { opacity: 1; border-color: var(--accent-line); }
 
   .upd-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .upd-hd {
@@ -175,13 +192,6 @@ const rows: Row[] = [
   @media (max-width: 720px) {
     .upd { grid-template-columns: 52px 1fr; gap: 12px; }
     .upd :global(.upd-thumb) { width: 52px; height: 52px; }
-    /* 52px 上格距跟着缩，不然只剩三条线像划痕 */
-    .upd-paper {
-      background-image:
-        repeating-linear-gradient(to bottom, transparent 0 11px,
-          color-mix(in srgb, var(--muted) 26%, transparent) 11px 12px);
-      background-position: 0 5px;
-    }
-    .upd-paper::after { left: 9px; top: 6px; bottom: 6px; }
+    .upd-mark :global(svg) { width: 24px; height: 24px; }
   }
 </style>
