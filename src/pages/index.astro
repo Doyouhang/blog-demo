@@ -9,7 +9,7 @@ import { interests } from '../data/interests';
 import { AUTHOR } from '../consts';
 import nowData from '../data/now.json';
 import stockData from '../data/stocks.json';
-import { cstISODate, cstYear } from '../utils/cst';
+import { cstISODate } from '../utils/cst';
 
 const B = import.meta.env.BASE_URL;
 
@@ -40,44 +40,48 @@ const latestOf = (slug: string) => {
 // 「此刻」：能从内容里算出来的就不要手写 —— 手写的迟早停在某个日期上。
 // now.json 留给算不出来的（在忙什么、在学什么），会接在自动那几条后面。
 interface NowItem { icon: IconName; text: string }
-const pick = (kind: string, status: string) =>
-  items.find((i) => i.data.kind === kind && i.data.status === status);
-// 手头没有在读 / 在看的时候，退到最近读完看完的那本 ——
-// 这一行整个消失比说"刚读完"更糟，读者会以为这个人什么都没干
-const book = pick('book', 'doing') ?? pick('book', 'done');
-const movie = pick('movie', 'doing') ?? pick('movie', 'done');
-const lastSong = items.find((i) => i.data.kind === 'song');
-const shelf = items.filter((i) => i.data.kind === 'book').length;
-const reel = items.filter((i) => i.data.kind === 'movie').length;
-const sparkYears = sparks.map((s) => cstYear(s.data.date));
-const sinceYear = sparkYears.length ? Math.min(...sparkYears) : null;
+
+// 「此刻」讲的是现在，不是总账。所以这里只收两种东西：
+//   1. 明确标着「在读 / 在看」的状态 —— 那本身就是当下，不看日期
+//   2. 最近一段时间里真的发生过的事 —— 看日期，过期就不说
+// 累计数（书架多少本、攒了多少条闪念）被拿掉了：它们确实永远不会空，
+// 但代价是这个盒子不再说明"现在"，随便哪天看都长一个样。
+//
+// 加了时间窗之后有些行会消失，那不是 bug —— 最新的一本书停在 2023 年、
+// 最新的一条动态停在 2025 年，硬写「最近读完」「最近拍于」就是在骗人。
+const DAY = 86400000;
+const nowMs = Date.now();
+const within = (d: Date, days: number) => nowMs - d.valueOf() <= days * DAY;
+const LATELY = 30;   // 「最近……」的尺度
+const JUST = 14;     // 「刚……」的尺度，要更近
+
+const reading = items.find((i) => i.data.kind === 'book' && i.data.status === 'doing');
+const watching = items.find((i) => i.data.kind === 'movie' && i.data.status === 'doing');
+const doneBook = items.find((i) => i.data.kind === 'book' && within(i.data.date, LATELY));
+const doneMovie = items.find((i) => i.data.kind === 'movie' && within(i.data.date, LATELY));
+const lastSong = items.find((i) => i.data.kind === 'song' && within(i.data.date, LATELY));
+const lastShot = heroMoment && within(heroMoment.data.date, LATELY) ? heroMoment : null;
+const freshSparks = sparks.filter((s) => within(s.data.date, JUST)).length;
 
 const nowRows: NowItem[] = [];
-if (book) nowRows.push({
-  icon: 'book',
-  text: `${book.data.status === 'doing' ? '在读' : '刚读完'}《${book.data.title}》`,
-});
-if (movie) nowRows.push({
-  icon: 'play',
-  text: `${movie.data.status === 'doing' ? '在看' : '刚看完'}《${movie.data.title}》`,
-});
+if (reading) nowRows.push({ icon: 'book', text: `在读《${reading.data.title}》` });
+else if (doneBook) nowRows.push({ icon: 'book', text: `最近读完《${doneBook.data.title}》` });
+if (watching) nowRows.push({ icon: 'play', text: `在看《${watching.data.title}》` });
+else if (doneMovie) nowRows.push({ icon: 'play', text: `最近看完《${doneMovie.data.title}》` });
 if (lastSong) nowRows.push({ icon: 'headphones', text: `最近在听 ${lastSong.data.title}` });
-if (heroMoment?.data.place) nowRows.push({ icon: 'camera', text: `最近拍于 ${heroMoment.data.place}` });
-// 攒下来的量。上面那几条讲"最近"，这两条讲"到现在为止"——
-// 一阵子没更新的时候，它们不会跟着一起空掉
-if (shelf || reel) nowRows.push({ icon: 'compass', text: `书架 ${shelf} 本 · 片单 ${reel} 部` });
-if (sparks.length) nowRows.push({
-  icon: 'bulb',
-  text: sinceYear ? `攒了 ${sparks.length} 条闪念，最早一条在 ${sinceYear} 年` : `攒了 ${sparks.length} 条闪念`,
-});
+if (lastShot?.data.place) nowRows.push({ icon: 'camera', text: `最近拍于 ${lastShot.data.place}` });
+if (freshSparks) nowRows.push({ icon: 'bulb', text: `刚更新 ${freshSparks} 条闪念` });
 // now.json 留给自动算不出来的，接在后面
 nowRows.push(...((nowData as { items?: NowItem[] }).items ?? []));
 
-// 「更新于」跟着最新的那条内容走，不再是手填的日期
-const nowAt = [book, movie, lastSong, heroMoment]
-  .filter((e): e is NonNullable<typeof e> => !!e)
+// 全站最新那条的时间。一条都没入选说明这阵子确实没动静 ——
+// 与其空着，不如老实说上次是什么时候
+const nowAt = [...items, ...moments, ...sparks]
   .map((e) => e.data.date.valueOf())
   .sort((a, b) => b - a)[0];
+if (nowRows.length === 0 && nowAt) {
+  nowRows.push({ icon: 'compass', text: `最近有点安静，上次记录是 ${cstISODate(new Date(nowAt))}` });
+}
 
 // 自选股：取涨跌幅绝对值最大的三只，另外用全部持仓画一排迷你柱
 interface StockRow { code: string; name: string; ok: boolean; percent?: number }
@@ -105,9 +109,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
         <div class="sec-hd">
           <h2>最近更新</h2>         
         </div>
-        <!-- 八条不是随便定的：右栏是「此刻 + 自选股 + 最近一张照片」三块，
-             六条时左边短一截，八条正好和它齐平 -->
-        <RecentUpdates limit={8} />
+        <RecentUpdates limit={7} />
       </div>
 
       <aside>
@@ -198,14 +200,22 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
   /* 最近一张照片，放在右栏最底下。左栏六条比右边两个盒子高出一截，
      这张图正好把差补上；而且放在这儿它是「此间」的入口，
      比挤在名字旁边当装饰更有用 */
+  /* 两栏齐平这件事交给这张图，别去猜「最近更新」该放几条 ——
+     「此刻」的行数本来就随内容变（书读完了、出门拍了照就多一行），
+     钉死一个数字迟早又对不上。.split 默认 align-items:start，
+     这里改成 stretch 让右栏拉到和左栏一样高，剩余空间由照片吃掉。 */
+  .split { align-items: stretch; }
+  .split > aside { display: flex; flex-direction: column; }
   .side-shot {
-    display: block; border: 1px solid var(--border); border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    flex: 1 1 auto; min-height: 168px; max-height: 340px;
+    border: 1px solid var(--border); border-radius: var(--radius);
     overflow: hidden; background: var(--card); color: inherit;
     transition: border-color var(--dur-fast) var(--ease);
   }
   .side-shot:hover { border-color: var(--accent); text-decoration: none; }
   .side-shot :global(img) {
-    display: block; width: 100%; height: 168px; object-fit: cover;
+    display: block; width: 100%; flex: 1 1 auto; min-height: 0; object-fit: cover;
   }
   .side-shot-cap {
     display: flex; align-items: center; gap: 8px;
@@ -236,7 +246,10 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
   }
 
   @media (max-width: 760px) {
-    .side-shot :global(img) { height: 140px; }
+    /* 单栏之后没有"另一栏"可对齐，给个固定高度就行 */
+    .split { align-items: start; }
+    .side-shot { flex: 0 0 auto; max-height: none; }
+    .side-shot :global(img) { flex: 0 0 auto; height: 140px; }
     .int-shelf { height: 76px; }
     .int-shelf :global(img) { max-height: 66px; }
   }
