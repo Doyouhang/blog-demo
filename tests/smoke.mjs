@@ -57,10 +57,22 @@ const updNotes = await page.evaluate(() =>
   [...document.querySelectorAll('.upd-note')].map((e) => e.textContent.trim()).filter(Boolean));
 ok('最近更新里没有同一条内容出现两次', new Set(updNotes).size === updNotes.length,
   updNotes.length + ' 条摘要');
-// 没有封面的那些用字印占位。原来是一个空框配 24px 小图标，很空
-const seals = await page.evaluate(() =>
-  [...document.querySelectorAll('.upd-seal')].map((e) => e.textContent.trim()));
-ok('无封面的条目用字印占位', seals.length > 0 && seals.every((t) => t.length === 1), seals.join(''));
+// 没有封面的那一格是纯纹理。它旁边的标签已经写明了类型，所以这里
+// 不该再有任何文字 —— 上一版在里面放汉字，和标签重复，看着也乱
+const paper = await page.evaluate(() => {
+  const els = [...document.querySelectorAll('.upd-paper')];
+  return {
+    n: els.length,
+    text: els.map((e) => e.textContent.trim()).join(''),
+    hidden: els.every((e) => e.getAttribute('aria-hidden') === 'true'),
+    // 横格是 background-image 画的。.upd-thumb 那条规则特异性更高，
+    // 一旦它改回 background 简写，就会把这里的 background-image 清成 none ——
+    // 格子还在、还是纸色，只是线没了，页面一声不吭。所以要量到这一层
+    ruled: els.every((e) => getComputedStyle(e).backgroundImage !== 'none'),
+  };
+});
+ok('无封面的条目用信笺纹理占位', paper.n > 0 && paper.text === '' && paper.hidden && paper.ruled,
+  `${paper.n} 格，文字「${paper.text}」，aria-hidden ${paper.hidden}，横格 ${paper.ruled}`);
 // 闪念正文换行之后的部分要出得来：标题是 nowrap 单行，整段塞进去会被省略号吃掉
 const sparkRow = await page.evaluate(() => {
   const row = [...document.querySelectorAll('.upd')].find(

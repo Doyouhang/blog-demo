@@ -46,14 +46,14 @@ function split(text: string, headMax = 40, tailMax = 52): [string, string] {
 const flat = (s: string, max = 52) => clip(String(s ?? '').replace(/\s+/g, ' ').trim(), max);
 
 const KIND = {
-  book: { label: '读书', page: 'reading', seal: '书' },
-  movie: { label: '影视', page: 'watching', seal: '影' },
-  song: { label: '音乐', page: 'music', seal: '音' },
+  book: { label: '读书', page: 'reading' },
+  movie: { label: '影视', page: 'watching' },
+  song: { label: '音乐', page: 'music' },
 };
 
 interface Row {
   date: Date; label: string; title: string; note?: string;
-  href: string; seal: string; cover?: ImageMetadata;
+  href: string; cover?: ImageMetadata;
 }
 
 const rows: Row[] = [
@@ -61,25 +61,25 @@ const rows: Row[] = [
     .filter((e) => !linked.has(e.id))
     .map((e) => ({
       date: e.data.pubDate, label: '长文', title: e.data.title,
-      note: flat(e.data.description), href: `${B}blog/${e.id}/`, seal: '文',
+      note: flat(e.data.description), href: `${B}blog/${e.id}/`,
     })),
   ...items.map((i) => ({
     date: i.data.date, label: KIND[i.data.kind].label,
     title: i.data.kind === 'song' ? i.data.title : `《${i.data.title}》`,
     note: flat(i.data.blurb), href: `${B}interests/${KIND[i.data.kind].page}/`,
-    seal: KIND[i.data.kind].seal, cover: i.data.cover,
+    cover: i.data.cover,
   })),
   ...moments.map((m) => {
     const [head, tail] = split(m.body ?? '');
     return {
       date: m.data.date, label: '此间', title: m.data.place ?? (head || '随手拍'),
       note: m.data.place ? head : tail, href: `${B}moments/`,
-      seal: '摄', cover: m.data.photos[0]?.src,
+      cover: m.data.photos[0]?.src,
     };
   }),
   ...sparks.map((s) => {
     const [head, tail] = split(s.body ?? '', 44);
-    return { date: s.data.date, label: '闪念', title: head, note: tail, href: `${B}sparks/`, seal: '念' };
+    return { date: s.data.date, label: '闪念', title: head, note: tail, href: `${B}sparks/` };
   }),
 ]
   .sort((a, b) => b.date.valueOf() - a.date.valueOf())
@@ -91,9 +91,12 @@ const rows: Row[] = [
       {r.cover ? (
         <Image class="upd-thumb" src={r.cover} alt="" width={132} />
       ) : (
-        /* 没有封面的那些不留一个空框配小图标，改成一枚字印 ——
-           和站名那枚朱红「迩」是同一套语言，安静但不空 */
-        <span class="upd-thumb upd-seal" aria-hidden="true">{r.seal}</span>
+        /* 没有封面的那一格：稿纸。
+           它必须**不带任何信息** —— 类型已经写在旁边的标签上了，方块里再放
+           一个字（试过「文」「念」）就是重复，而重复的装饰只会变成噪音。
+           所以这里只有纹理，aria-hidden，它唯一的职责是让这一行不空、
+           并且让所有标题落在同一条竖线上。 */
+        <span class="upd-thumb upd-paper" aria-hidden="true"></span>
       )}
       <span class="upd-body">
         <span class="upd-hd">
@@ -119,17 +122,36 @@ const rows: Row[] = [
 
   /* 封面比例各不相同（书是竖的、歌是方的），统一裁进一个固定的框，
      一排扫下来标题才在同一条竖线上 */
+  /* 这里必须用 background-color 而不是 background 简写：简写会把
+     .upd-paper 设的 background-image 一起清成 none，而这条规则的特异性
+     比它高一级。踩过一次，横格画了但一直看不见 */
   .upd :global(.upd-thumb) {
     width: 66px; height: 66px; border-radius: var(--radius); display: block;
-    object-fit: cover; background: var(--bg-soft); border: 1px solid var(--border);
+    object-fit: cover; background-color: var(--bg-soft); border: 1px solid var(--border);
   }
-  .upd-seal {
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-display); font-size: 27px; line-height: 1;
-    color: var(--muted); letter-spacing: 0;
-    transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  /* 一页信笺：横格 + 左边那道朱红栏线。
+     选它而不是格子或者空框，是因为它语义正好 —— 没有封面的就是长文和闪念，
+     本来就是「一页写着字的纸」。而且它有块面感，和旁边有封面的行节奏是齐的。 */
+  .upd-paper {
+    position: relative;
+    /* 两行 background-image 是一对：老浏览器解析不了 color-mix 会退回上一行，
+       只剩纸色，不会整块塌掉 */
+    background-image:
+      repeating-linear-gradient(to bottom, transparent 0 13px, var(--border) 13px 14px);
+    background-image:
+      repeating-linear-gradient(to bottom, transparent 0 13px,
+        color-mix(in srgb, var(--muted) 26%, transparent) 13px 14px);
+    background-position: 0 6px;
+    transition: border-color var(--dur-fast) var(--ease);
   }
-  .upd:hover .upd-seal { color: var(--accent); border-color: var(--accent-line); }
+  /* 栏线。朱红是全站唯一的点缀色，这里只给一丝 */
+  .upd-paper::after {
+    content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 1px;
+    background: var(--seal); opacity: 0.5;
+    transition: opacity var(--dur) var(--ease);
+  }
+  .upd:hover .upd-paper { border-color: var(--accent-line); }
+  .upd:hover .upd-paper::after { opacity: 0.85; }
 
   .upd-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .upd-hd {
@@ -153,6 +175,13 @@ const rows: Row[] = [
   @media (max-width: 720px) {
     .upd { grid-template-columns: 52px 1fr; gap: 12px; }
     .upd :global(.upd-thumb) { width: 52px; height: 52px; }
-    .upd-seal { font-size: 22px; }
+    /* 52px 上格距跟着缩，不然只剩三条线像划痕 */
+    .upd-paper {
+      background-image:
+        repeating-linear-gradient(to bottom, transparent 0 11px,
+          color-mix(in srgb, var(--muted) 26%, transparent) 11px 12px);
+      background-position: 0 5px;
+    }
+    .upd-paper::after { left: 9px; top: 6px; bottom: 6px; }
   }
 </style>
