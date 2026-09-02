@@ -49,28 +49,34 @@ const flat = (s: string, max = 52) => clip(String(s ?? '').replace(/\s+/g, ' ').
  * 没有封面的只可能是长文和闪念 —— 这两类天生没有 cover 字段。
  * （收藏和此间理论上也可能缺图，退回长文那枚。）
  *
- * 两枚共用同一套语言：墨线打底 + 一点朱红，圆头圆角，24 格。
- * icons 规则库里那条「同一个界面只保留一个视觉族」说的就是这件事。
+ * 两枚共用一套语言：墨线画壳，朱红只落在「意思所在」的那一处 ——
+ * 书上是书签，灯上是光。24 格、1.4 描边、圆头圆角。
  *
- * 试废过四种：卷轴（读成杠铃）、竖排三竖（读成条码）、朱笔圈点和偏心墨晕
- * （都读成加载转圈）、引号（这个尺寸下散成两个方块）。
- * 32px 上留得住的只有明确的整体轮廓，细节全是噪音。
+ * 闪念这枚要的是「啪一下亮了」那个瞬间，不是一只造型特别的灯泡：
+ * 灯泡只是载体，光才是主角，所以外壳画得很素，朱红全给了光点。
+ * 光都在上半圈，只按灯泡摆整体会偏下，所以整组往下挪 1.4 找重心。
  */
 const MARKS = {
-  // 长文 · 摊开的书，右页一枚朱红藏书印
+  // 长文 · 合上的书，一枚朱红书签从上边探出来
   essay: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
       stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 7.4C10 5.9 7.6 5.2 4.8 5.2H3.4v12.4h1.4c2.8 0 5.2.7 7.2 2.2"/>
-      <path d="M12 7.4c2-1.5 4.4-2.2 7.2-2.2h1.4v12.4h-1.4c-2.8 0-5.2.7-7.2 2.2"/>
-      <path d="M12 7.4v12.4"/>
-      <circle cx="17.4" cy="14.4" r="1.05" fill="var(--seal)" stroke="none"/>
+      <rect x="5" y="3.8" width="14" height="16.4" rx="1.6"/>
+      <path d="M8.4 3.8v16.4"/>
+      <path d="M13.4 3.8v7.2l1.9-1.5 1.9 1.5V3.8" stroke="var(--seal)"/>
     </svg>`,
-  // 闪念 · 一笔朱砂，起笔处落一个墨点
+  // 闪念 · 灯泡亮起来，光画成五个朱砂点
   spark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
       stroke-linecap="round" stroke-linejoin="round">
-      <g transform="translate(0.4 -1.1)">
-        <path d="M8.4 17.4c1.4-6.6 4-10.2 7.8-10.8" stroke="var(--seal)" stroke-width="2.4"/>
-        <circle cx="7.5" cy="19.4" r="1.35" fill="currentColor" stroke="none"/>
+      <g transform="translate(0 1.4)">
+        <path d="M12 5.3a4.7 4.7 0 0 0-2.7 8.5c.5.4.9 1 .9 1.7v.4h3.6v-.4c0-.7.4-1.3.9-1.7A4.7 4.7 0 0 0 12 5.3Z"/>
+        <path d="M10.2 17.4h3.6M11 19.4h2"/>
+        <g fill="var(--seal)" stroke="none">
+          <circle cx="5.59" cy="6.3" r=".85"/>
+          <circle cx="8.3" cy="3.59" r=".85"/>
+          <circle cx="12" cy="2.6" r=".85"/>
+          <circle cx="15.7" cy="3.59" r=".85"/>
+          <circle cx="18.41" cy="6.3" r=".85"/>
+        </g>
       </g>
     </svg>`,
 };
@@ -125,7 +131,7 @@ const rows: Row[] = [
   {rows.map((r) => (
     <a class="upd" href={r.href}>
       {r.cover ? (
-        <Image class="upd-thumb" src={r.cover} alt="" width={132} />
+        <Image class="upd-thumb upd-cover" src={r.cover} alt="" width={132} />
       ) : (
         /* 没有封面的那一格：长文和闪念各有一枚固定标记。
            aria-hidden —— 类型已经写在旁边的标签上，读屏再念一遍纯属干扰。 */
@@ -155,19 +161,25 @@ const rows: Row[] = [
 
   /* 封面比例各不相同（书是竖的、歌是方的），统一裁进一个固定的框，
      一排扫下来标题才在同一条竖线上 */
-  /* 这里必须用 background-color 而不是 background 简写：简写会把
-     .upd-paper 设的 background-image 一起清成 none，而这条规则的特异性
-     比它高一级。踩过一次，横格画了但一直看不见 */
+  /* 这条只负责「盒子」——尺寸、圆角、边框、底色。
+     千万别在这里写 display / background 简写之类的东西：它的特异性
+     （.upd + 作用域属性 + .upd-thumb）比下面两个变体高一级，写进来就会
+     把变体里的设置顶掉，而且页面一声不吭。已经踩过两次 ——
+     background 简写清掉了纹理的 background-image，display:block 让
+     标记的 flex 居中失效、图标一直缩在左上角。 */
   .upd :global(.upd-thumb) {
-    width: 66px; height: 66px; border-radius: var(--radius); display: block;
-    object-fit: cover; background-color: var(--bg-soft); border: 1px solid var(--border);
+    width: 66px; height: 66px; border-radius: var(--radius);
+    background-color: var(--bg-soft); border: 1px solid var(--border);
   }
+  /* 有封面的那一格 */
+  .upd :global(.upd-cover) { display: block; object-fit: cover; }
+  /* 没有封面的那一格 */
   .upd-mark {
     display: flex; align-items: center; justify-content: center;
     color: var(--muted); opacity: 0.85;
     transition: opacity var(--dur) var(--ease), border-color var(--dur-fast) var(--ease);
   }
-  .upd-mark :global(svg) { width: 32px; height: 32px; }
+  .upd-mark :global(svg) { width: 40px; height: 40px; }
   .upd:hover .upd-mark { opacity: 1; border-color: var(--accent-line); }
 
   .upd-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -192,6 +204,6 @@ const rows: Row[] = [
   @media (max-width: 720px) {
     .upd { grid-template-columns: 52px 1fr; gap: 12px; }
     .upd :global(.upd-thumb) { width: 52px; height: 52px; }
-    .upd-mark :global(svg) { width: 24px; height: 24px; }
+    .upd-mark :global(svg) { width: 32px; height: 32px; }
   }
 </style>
