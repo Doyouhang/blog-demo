@@ -226,6 +226,48 @@ await page.click('details.fold summary');
 const foldAfter = await page.locator('details.fold').first().evaluate((e) => e.open);
 ok('超长的那条默认折起、点开能展开', foldBefore === false && foldAfter === true);
 
+// 进场动效：脚本只负责打 .seen，动画交给 CSS。三件事要同时成立，缺一件都算坏：
+//   ① 屏外的条目确实是隐藏态 —— 否则动效等于不存在（第一版就是这样：
+//      animation-range 的 entry 阶段长度等于元素高度，一句话的条目只有 60px，
+//      动画在 24px 滚动距离内、视口底边之外就播完了，人眼一帧都看不到）
+//   ② 滚到了就播完
+//   ③ 脚本没生效时一切照旧
+await page.goto(BASE + '/sparks/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(600);
+const motion = await page.evaluate(() => {
+  const opa = (e) => +getComputedStyle(e).opacity;
+  const jots = [...document.querySelectorAll('.jot')];
+  const above = jots.filter((j) => j.getBoundingClientRect().top < innerHeight * 0.85);
+  const below = jots.filter((j) => j.getBoundingClientRect().top > innerHeight);
+  return {
+    on: document.documentElement.classList.contains('jot-motion'),
+    playedIn: above.length > 0 && Math.min(...above.map(opa)) > 0.99,
+    hiddenOut: below.length > 0 && Math.max(...below.map(opa)) < 0.01,
+  };
+});
+ok('闪念进场动效真的在跑', motion.on && motion.playedIn && motion.hiddenOut, JSON.stringify(motion));
+
+// 瞬时跳转（RSS 的 #日期 深链、Cmd+↓、页内搜索、恢复滚动位置）掠过的条目
+// 不能永久隐形。IntersectionObserver 版本就是死在这里：元素从「在下面」直接
+// 变成「在上面」，相交比例全程是 0，一次回调都不发，那一屏内容全是空的。
+await page.evaluate(() => scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
+await page.waitForTimeout(700);
+const jumped = await page.evaluate(() => {
+  const due = [...document.querySelectorAll('.jot')]
+    .filter((j) => j.getBoundingClientRect().top < innerHeight * 0.85);
+  return { n: due.length, worst: Math.min(...due.map((j) => +getComputedStyle(j).opacity)) };
+});
+ok('瞬时跳到页底不会有条目永久隐形', jumped.n > 0 && jumped.worst > 0.99,
+  `${jumped.n} 条，最差 ${jumped.worst.toFixed(2)}`);
+
+// 隐藏态只挂在 html.jot-motion 上，而这个类是脚本加的。
+// 动效坏掉的代价只能是「没有动效」，绝不能是「没有内容」。
+const noMotion = await page.evaluate(() => {
+  document.documentElement.classList.remove('jot-motion');
+  return Math.min(...[...document.querySelectorAll('.jot')].map((j) => +getComputedStyle(j).opacity));
+});
+ok('脚本没生效时内容照常可见', noMotion > 0.99, `最差 ${noMotion.toFixed(2)}`);
+
 // ——— 影视页 ———
 await page.goto(BASE + '/interests/watching/', { waitUntil: 'networkidle' });
 ok('影视页可访问', (await page.title()).includes('影视'), await page.title());

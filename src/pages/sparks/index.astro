@@ -137,8 +137,136 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
   }
 
+  /* ===== 悬停 ===== */
+  /* 提亮块用伪元素铺，不能直接给 .jot 加 margin-inline/padding-inline ——
+     那样底部分隔线会比月份标题的横线宽出 24px，两条线对不齐。
+     这正是文件开头那条注释在讲的坑，别再踩一次。 */
+  .jot { position: relative; z-index: 0; }
+  .jot::after {
+    content: ''; position: absolute; inset: 6px -12px; z-index: -1;
+    border-radius: 8px; background: transparent; pointer-events: none;
+    transition: background var(--dur) var(--ease);
+  }
+  .jot:hover::after { background: var(--bg-soft); }
+  .when { transition: color var(--dur-fast) var(--ease); }
+  .jot:hover .when { color: var(--seal); }
+
+  /* ===== 展开/收起做成滑动 ===== */
+  /* interpolate-size 是可继承属性，写在 .fold 上就够，::details-content 会继承。
+     少了它，block-size 到 auto 不可插值，展开是「跳」不是「滑」。 */
+  .fold { interpolate-size: allow-keywords; }
+  .fold :global(::details-content) {
+    block-size: 0; overflow: clip;
+    transition: block-size var(--dur) var(--ease), content-visibility var(--dur) allow-discrete;
+  }
+  .fold[open] :global(::details-content) { block-size: auto; }
+
+  /* ===== 进场：整条淡入上浮，日期左边的灯泡错开 80ms 再亮 ===== */
+  /* 读起来是「内容到位，然后灵感一闪」，两件事同时发生反而糊成一团。
+     灯泡这个意象跟「最近更新」里闪念用的图标是同一套。 */
+  .when::before {
+    content: ''; position: absolute; left: -14px; top: 9px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--seal); opacity: .3;
+  }
+  /* 初始隐藏态只在 html.jot-motion 下生效，而这个类是脚本加的 ——
+     脚本没跑、报错、被拦截，页面就是原来的样子。
+     绝不能让「动效坏了」变成「内容看不见」。 */
+  :global(html.jot-motion) .jot {
+    opacity: 0; transform: translateY(10px);
+    transition: opacity var(--dur-slow) var(--ease), transform var(--dur-slow) var(--ease-spring);
+  }
+  :global(html.jot-motion) .jot.seen { opacity: 1; transform: none; }
+  :global(html.jot-motion) .jot.seen .when::before {
+    animation: jot-bulb var(--dur-slow) var(--ease) 80ms both;
+  }
+  @keyframes jot-bulb {
+    0%   { opacity: .25; box-shadow: 0 0 0 0 transparent; }
+    55%  { opacity: 1;   box-shadow: 0 0 0 7px color-mix(in srgb, var(--seal) 26%, transparent); }
+    100% { opacity: .9;  box-shadow: 0 0 0 0 transparent; }
+  }
+
+  /* 打印：没滚到的条目此刻还是隐藏态，不兜住的话会印出整页空白 */
+  @media print {
+    :global(html.jot-motion) .jot { opacity: 1 !important; transform: none !important; }
+    .when::before { display: none; }
+  }
+
+  /* 系统说要减弱动态效果：脚本压根不会加 jot-motion，这里再兜一层，
+     把悬停和展开的过渡也一并停掉 */
+  @media (prefers-reduced-motion: reduce) {
+    .jot::after, .when, .fold :global(::details-content) { transition: none; }
+    :global(html.jot-motion) .jot { opacity: 1; transform: none; transition: none; }
+    :global(html.jot-motion) .jot.seen .when::before { animation: none; }
+  }
+
   @media (max-width: 560px) {
     .jot { grid-template-columns: 1fr; gap: 6px; }
     .when { flex-direction: row; gap: 8px; padding-top: 0; }
   }
+  @media (max-width: 560px) {
+    /* 窄屏日期和正文并成一行，灯泡挪不出左边距，收起来 */
+    .when::before { display: none; }
+  }
 </style>
+
+<script>
+  import { onPageReady, markReady } from '../../scripts/init';
+
+  // 进场动效：脚本只负责在合适的时候打 .seen，动画本身交给 CSS。
+  //
+  // 为什么不用 IntersectionObserver：IO 只在「相交状态发生变化」时回调。
+  // 瞬时跳转（RSS 的 /sparks/#日期 深链、Cmd+↓、页内搜索、恢复滚动位置）
+  // 会让元素从「在下面」直接变成「在上面」，相交比例全程是 0，一次回调都不发 ——
+  // 那些条目就永久停在 opacity: 0。页面照样 200，控制台一声不吭。
+  // 量过：瞬时跳到页底，最差 opacity = 0，整屏内容是空的。
+  //
+  // 为什么不用 animation-timeline: view()（滚动驱动）：它的进度绑在
+  // 「元素还能滚多远」上，而页面最后几条下面没内容可滚，会永久停在中间态；
+  // 想靠缩短范围躲开，动画又全程发生在视口底边之外，等于没有。两头堵死。
+  //
+  // 条目就几十个，每帧读一遍位置的成本可以忽略，换来的是任何滚法都不丢内容。
+  function initJots() {
+    const stream = document.querySelector('.stream') as HTMLElement | null;
+    if (!markReady(stream)) return;
+    // 系统要求减弱动态效果时，连隐藏态都不要加上
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const items = [...stream!.querySelectorAll('.jot')] as HTMLElement[];
+    if (!items.length) return;
+    document.documentElement.classList.add('jot-motion');
+
+    // 两条线而不是一条，滞回防抖：
+    //   进屏到 88% 高度  → 触发
+    //   完全落到视口下方 → 复位，滚回来会重播
+    // 共用一条线的话，元素停在线附近会反复闪；而且往回滚时内容会在眼前淡出。
+    const IN = 0.88, OUT = 1;
+    let ticking = false;
+    const sweep = () => {
+      ticking = false;
+      // 换页之后这些节点已经不在文档里了，顺手把监听摘掉，别留着空转
+      if (!stream!.isConnected) {
+        removeEventListener('scroll', onScroll);
+        removeEventListener('resize', onScroll);
+        return;
+      }
+      const h = innerHeight;
+      // 先把位置读完再改 class：读写交替会在一帧内反复触发重排
+      const tops = items.map((el) => el.getBoundingClientRect().top);
+      items.forEach((el, i) => {
+        const seen = el.classList.contains('seen');
+        if (!seen && tops[i] < h * IN) el.classList.add('seen');
+        else if (seen && tops[i] > h * OUT) el.classList.remove('seen');
+      });
+    };
+    const onScroll = () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(sweep); }
+    };
+    addEventListener('scroll', onScroll, { passive: true });
+    addEventListener('resize', onScroll, { passive: true });
+    // 展开长条目会把下面的条目整体推走，位置变了要重算。toggle 不冒泡，得用捕获
+    stream!.addEventListener('toggle', onScroll, true);
+    sweep();
+  }
+  onPageReady(initJots);
+</script>
