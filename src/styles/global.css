@@ -580,20 +580,7 @@ footer.site {
 }
 .skip-link:focus { top: 12px; }
 
-/* 文章目录 */
-.toc {
-  border: 1px solid var(--border); border-radius: 8px; background: var(--card);
-  padding: 14px 20px; margin: 20px 0 6px;
-}
-.toc h2 {
-  margin: 0 0 8px; font-family: var(--font-mono); font-size: 11px;
-  letter-spacing: 0.14em; color: var(--muted); font-weight: 700;
-}
-.toc ol { margin: 0; padding-left: 20px; }
-/* 目录项原来净高 16px，不到 WCAG 2.2 要求的 24。
-   padding 顶替原来的 margin，总行高不变，只是可点范围铺满了 */
-.toc li { margin: 0; font-size: 14px; }
-.toc li a { display: inline-block; padding: 5px 0; }
+/* 文章目录挪到了 src/pages/blog/[...slug].astro 里的左侧刻度 */
 
 /* colophon 色板 */
 .swatches { display: inline-flex; gap: 5px; }

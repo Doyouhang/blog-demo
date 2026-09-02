@@ -85,12 +85,23 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
       ))}
     </div>
     {toc.length >= 2 && (
-      <nav class="toc" aria-label="本文目录">
-        <h2>目录</h2>
-        <ol>
-          {toc.map((t) => <li><a href={`#${t.id}`}>{t.text}</a></li>)}
-        </ol>
-      </nav>
+      <>
+        {/* 宽屏：正文左外侧一列刻度，当前小节那道变长变朱红，悬停展开成面板 */}
+        <nav class="toc-rail" aria-label="本文目录">
+          {toc.map((t) => (
+            <a href={`#${t.id}`} data-toc={t.id}>
+              <i aria-hidden="true"></i><span>{t.text}</span>
+            </a>
+          ))}
+        </nav>
+        {/* 窄屏没有富余的横向空间，硬塞只会压正文，退回折叠块 */}
+        <details class="toc-fold">
+          <summary>目录</summary>
+          <ol>
+            {toc.map((t) => <li><a href={`#${t.id}`}>{t.text}</a></li>)}
+          </ol>
+        </details>
+      </>
     )}
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <div class="prose" style="margin-top:18px"><Content /></div>
@@ -118,3 +129,90 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
 
   </article>
 </BaseLayout>
+
+<style>
+  /* ——— 左侧刻度目录 ———
+     只在放得下的宽度出现。正文 880px 居中之后两侧各只剩 260px，
+     按「视口中线减半个正文宽」定位会直接压在正文上（第一版就是这么错的）。
+     正确做法是让「刻度 + 正文」整体居中：正文让出左边一栏，刻度贴这一组的左缘。 */
+  .toc-rail {
+    position: fixed; left: calc(50% - 545px); top: 50%; transform: translateY(-50%);
+    display: none; flex-direction: column; gap: 2px; z-index: 5; padding: 6px 0;
+  }
+  .toc-rail a {
+    display: flex; align-items: center; gap: 10px; height: 26px;
+    color: var(--muted); text-decoration: none; font-size: 13px;
+  }
+  .toc-rail i {
+    display: block; width: 18px; height: 2px; border-radius: 2px; flex: 0 0 auto;
+    background: var(--border);
+    transition: width var(--dur) var(--ease), background var(--dur) var(--ease);
+  }
+  .toc-rail span {
+    max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0;
+    /* 长标题要有省略号：切在半路会读成渲染坏了，不像是有意截断 */
+    text-overflow: ellipsis;
+    transition: max-width var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  }
+  /* 展开时浮成一块面板。间距只有几像素，不给底的话会读成「字压在正文上」 */
+  .toc-rail:hover, .toc-rail:focus-within {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; box-shadow: var(--shadow-card);
+  }
+  .toc-rail:hover span, .toc-rail:focus-within span { max-width: 200px; opacity: 1; }
+  .toc-rail a[aria-current='true'] { color: var(--fg); }
+  .toc-rail a[aria-current='true'] i { width: 30px; background: var(--seal); }
+  .toc-rail a:hover i { background: var(--accent); }
+  .toc-rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  /* 窄屏的折叠块 */
+  .toc-fold {
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+    padding: 10px 20px; margin: 20px 0 6px;
+  }
+  .toc-fold summary {
+    cursor: pointer; font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: 0.14em; color: var(--muted); padding: 4px 0;
+  }
+  .toc-fold ol { margin: 8px 0 4px; padding-left: 20px; }
+  .toc-fold li { margin: 0; font-size: 14px; }
+  /* 净高 16px 不到 WCAG 2.2 的 24，padding 顶替 margin，总行高不变 */
+  .toc-fold li a { display: inline-block; padding: 5px 0; }
+
+  @media (min-width: 1160px) {
+    .toc-rail { display: flex; }
+    .toc-fold { display: none; }
+    /* :has 不支持时正文保持居中、面板悬停时盖在正文上，仍然可用 */
+    :global(main.container:has(.toc-rail)) { max-width: 1090px; padding-left: 234px; }
+  }
+  /* 标题跳转时别被吸顶的页眉盖住 */
+  .prose :global(h2) { scroll-margin-top: 80px; }
+</style>
+
+<script>
+  import { onPageReady, markReady } from '../../scripts/init';
+
+  // 跟随高亮：当前小节 = 视口里最后一个越过 90px 线的标题。
+  // 用 scroll 事件而不是 IntersectionObserver —— 小节高度差很大，
+  // 交叉比例那套在长小节里会整段没有任何标题「在视口内」，高亮就断了。
+  function initTocRail() {
+    const rail = document.querySelector('.toc-rail') as HTMLElement | null;
+    if (!markReady(rail)) return;
+    const links = [...rail!.querySelectorAll('a[data-toc]')] as HTMLAnchorElement[];
+    const heads = links
+      .map((a) => document.getElementById(a.dataset.toc!))
+      .filter((el): el is HTMLElement => !!el);
+    if (!heads.length) return;
+    const sync = () => {
+      let cur = heads[0].id;
+      for (const h of heads) if (h.getBoundingClientRect().top <= 90) cur = h.id;
+      for (const a of links) {
+        if (a.dataset.toc === cur) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      }
+    };
+    addEventListener('scroll', sync, { passive: true });
+    sync();
+  }
+  onPageReady(initTocRail);
+</script>

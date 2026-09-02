@@ -375,6 +375,37 @@ if (zhWord) {
 const rNone = await doSearch('zzzzqqqq');
 ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
 
+// 文章左侧的刻度目录：跟随高亮是滚动时算的，断了不会报错，页面照样 200。
+{
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(BASE + '/blog/astro-github-pages/', { waitUntil: 'networkidle' });
+  const n = await page.locator('.toc-rail a').count();
+  const heads = await page.locator('.prose h2').count();
+  ok('目录刻度和小节一一对应', n > 0 && n === heads, `${n} 条 / ${heads} 个小节`);
+  // 每一项都要能跳到真实存在的锚点
+  const dead = await page.evaluate(() =>
+    [...document.querySelectorAll('.toc-rail a')].filter((a) => !document.getElementById(a.dataset.toc)).length);
+  ok('刻度的锚点都能落地', dead === 0, `断的 ${dead}`);
+  // 站上开了 scroll-behavior: smooth，必须瞬时滚动再量，否则会量在动画中间
+  const hit = await page.evaluate(() => {
+    const hs = [...document.querySelectorAll('.prose h2')];
+    const want = hs[Math.min(5, hs.length - 1)];
+    window.scrollTo({ top: want.getBoundingClientRect().top + scrollY - 40, behavior: 'instant' });
+    return want.textContent.trim();
+  });
+  await page.waitForTimeout(300);
+  const cur = await page.evaluate(() =>
+    document.querySelector('.toc-rail a[aria-current="true"]')?.textContent.trim() ?? '');
+  ok('跟随高亮跟得上', cur === hit, `滚到「${hit}」高亮「${cur}」`);
+  // 窄屏没有横向余量，应退回折叠块
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(200);
+  const railOn = await page.locator('.toc-rail').isVisible();
+  const foldOn = await page.locator('.toc-fold').isVisible();
+  ok('窄屏退回折叠目录', !railOn && foldOn, `刻度 ${railOn} / 折叠 ${foldOn}`);
+  await page.setViewportSize({ width: 1280, height: 900 });
+}
+
 // 代码块里每一种 token 颜色都要够读。github-dark 自带的注释色在 #24292e 上
 // 只有 3.05，构建期换成了 #8B949E —— 这里不写死颜色，直接量每种颜色的对比度，
 // 换主题、加语言、Shiki 升级都拦得住。
