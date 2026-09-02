@@ -38,7 +38,10 @@ export async function GET(context) {
   return rss({
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    site: context.site,
+    // 频道 link 要带上子路径。context.site 是 https://用户名.github.io，
+    // 而项目页真正的首页在 /blog-demo/ —— 直接用 context.site，阅读器里点
+    // 「访问网站」会跳到用户页根目录，那是另一个站。条目链接本来就是对的。
+    site: new URL(B, context.site).href,
     items: items.map((i) => ({ ...i, link: new URL(i.link, context.site).href })),
   });
 }

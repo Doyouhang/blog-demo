@@ -375,6 +375,40 @@ if (zhWord) {
 const rNone = await doSearch('zzzzqqqq');
 ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
 
+// 段落里的硬换行要留住。笔记类文章靠换行断句，Markdown 默认把段落内的单个换行
+// 折成空格 —— 奥德赛那 26 行引文会塌成一整段，而构建、控制台、状态码全是正常的。
+// 不查 white-space 这个属性值（改成别的写法照样能对），直接量渲染出来有几行。
+{
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(BASE + '/blog/', { waitUntil: 'networkidle' });
+  const links = await page.evaluate(() =>
+    [...new Set([...document.querySelectorAll('a[href]')]
+      .map((a) => new URL(a.getAttribute('href'), location.href).pathname)
+      .filter((h) => /\/blog\/[^/]+\/$/.test(h) && !h.includes('/blog/tags/')))]);
+  let checked = 0;
+  const flat = [];
+  for (const href of links) {
+    await page.goto(new URL(href, BASE).href, { waitUntil: 'networkidle' });
+    const r = await page.evaluate(() => {
+      const out = [];
+      for (const p of document.querySelectorAll('.prose p')) {
+        const n = (p.textContent.match(/\n/g) ?? []).length;
+        if (!n) continue;
+        // 一行有多高，拿同一个段落的行高算，别写死数字
+        const lh = parseFloat(getComputedStyle(p).lineHeight);
+        // 换行没生效的话，n 个换行会被折成空格，高度就只有折行后的自然行数
+        out.push({ breaks: n, rows: Math.round(p.getBoundingClientRect().height / lh) });
+      }
+      return out;
+    });
+    checked += r.length;
+    // 段落里有 n 个换行，渲染出来至少要有 n+1 行
+    if (r.some((x) => x.rows < x.breaks + 1)) flat.push(href);
+  }
+  ok('正文里的硬换行没被吃掉', checked > 0 && flat.length === 0,
+    `带换行的段落 ${checked} 个，塌掉的 ${flat.length}${flat.length ? '：' + flat.join(' ') : ''}`);
+}
+
 // 文章左侧的刻度目录：跟随高亮是滚动时算的，断了不会报错，页面照样 200。
 {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -490,6 +524,10 @@ ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').
 const feedRes = await page.request.get(BASE + '/rss.xml');
 const feedTxt = feedRes.ok() ? await feedRes.text() : '';
 ok('RSS feed 可访问且格式正确', feedRes.ok() && feedTxt.includes('<rss') && feedTxt.includes('<item>'), `status ${feedRes.status()}`);
+// 频道 link 少了子路径的话，阅读器里点「访问网站」会跳到用户页根目录。
+// 比的是「以 base 结尾」而不是写死域名：feed 里是线上地址，测试跑在本地。
+const chanLink = (feedTxt.match(/<channel>[\s\S]*?<link>([^<]+)<\/link>/) ?? [])[1] ?? '';
+ok('RSS 频道链接带上了子路径', chanLink.endsWith(PREFIX + '/'), chanLink);
 // 闪念在 feed 里是深链到某一条（#日期），锚点断了订阅点进来只会落到页顶
 const anchors = [...feedTxt.matchAll(/<link>[^<]*\/sparks\/#([\d-]+)<\/link>/g)].map((m) => m[1]);
 await page.goto(BASE + '/sparks/');

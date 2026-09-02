@@ -356,6 +356,14 @@ article { max-width: 720px; margin: 0 auto; }
 .split .prose p { margin: 0 0 16px; }
 article h1 { font-size: 30px; margin-bottom: 6px; line-height: 1.35; }
 .date { color: var(--muted); font-size: 14px; margin-top: 0; }
+/* 段落里的硬换行要留住。笔记类文章（微信读书导出、诗句引文）就是靠换行断句的，
+   而 Markdown 默认把段落内的单个换行折成一个空格 —— 奥德赛那 26 行引文会塌成
+   一整段，1984 的「战争即和平／自由即奴役／无知即力量」会挤成一行。
+   闪念页用的就是这一招（src/pages/sparks/index.astro），保持一致，也不引新依赖；
+   换 remark-breaks 反而会和闪念页的 pre-wrap 叠成双倍换行。
+   前提是正文里没有 1-3 个空格的缩进行（会被原样显出来），已确认没有。 */
+.prose p { white-space: pre-wrap; }
+
 .prose img { max-width: 100%; height: auto; border-radius: 10px; }
 .prose pre {
   background: var(--console-bg); color: var(--console-fg);
