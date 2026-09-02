@@ -92,7 +92,27 @@ npm run dev      # 本地预览，默认 http://localhost:4321
 npm run check    # 类型检查（astro check），CI 里也会跑，提交前建议过一遍
 npm run build    # 生成静态站点到 dist/（项目页会自动带 /blog-demo/ 前缀）
 npm run preview  # 预览构建产物
+npm run studio   # 本地图文编辑器，http://localhost:4331
 ```
+
+### 进程与端口
+
+本地的几个进程各占一个端口。报「端口被占用」通常是上一次的进程没退干净：
+
+| 端口 | 进程 | 清理 |
+| --- | --- | --- |
+| 4321 | `astro dev` / `astro preview` | `pkill -f "astro[ ]dev"` / `pkill -f "astro[ ]preview"` |
+| 4331 | studio（`npm run studio`） | `pkill -f "studio/server.mjs"` |
+| `SMOKE_PORT`（默认 4321） | 冒烟测试起的临时 preview | 一般自动退；残留按上面 preview 杀 |
+
+看端口被谁占着：
+
+```bash
+ss -tlnp | grep 4321    # 或 netstat -tlnp | grep 4321
+```
+
+`pkill -f "astro[ ]preview"` 里的方括号让模式匹配不到 pkill 自己的命令行，不会误杀自己。
+冒烟测试报端口占用时也可以换端口绕开：`SMOKE_PORT=4351 npm run test:smoke`（4331 是 studio 的，别用）。
 
 ## 目录结构
 
