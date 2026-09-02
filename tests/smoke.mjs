@@ -403,6 +403,34 @@ ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').
   const railOn = await page.locator('.toc-rail').isVisible();
   const foldOn = await page.locator('.toc-fold').isVisible();
   ok('窄屏退回折叠目录', !railOn && foldOn, `刻度 ${railOn} / 折叠 ${foldOn}`);
+
+  // 章节多的文章（《人类简史》18 章）比矮窗口还高。刻度栏是垂直居中的固定定位，
+  // 没有高度上限的话上半截会被顶出屏幕、或者钻进吸顶页眉底下 ——
+  // 不是「看不全」，是点不到，而且页面照样 200、控制台一声不吭。
+  // 不挑某一篇，所有文章都过一遍：以后加长文不用记得回来改这里。
+  await page.setViewportSize({ width: 1280, height: 460 });
+  await page.goto(BASE + '/blog/', { waitUntil: 'networkidle' });
+  const posts = await page.evaluate(() =>
+    [...new Set([...document.querySelectorAll('a[href]')]
+      .map((a) => new URL(a.getAttribute('href'), location.href).pathname)
+      .filter((h) => /\/blog\/[^/]+\/$/.test(h) && !h.includes('/blog/tags/')))]);
+  const unreachable = [];
+  for (const href of posts) {
+    await page.goto(new URL(href, BASE).href, { waitUntil: 'networkidle' });
+    const r = await page.evaluate(() => {
+      const rail = document.querySelector('.toc-rail');
+      const a = rail?.querySelector('a');
+      if (!a) return null;   // 这篇没目录，不适用
+      const b = a.getBoundingClientRect();
+      // 量「点得到」而不是「在不在 DOM 里」：被页眉盖住时两者结论相反
+      return rail.contains(document.elementFromPoint(b.left + 4, b.top + b.height / 2));
+    });
+    if (r === false) unreachable.push(href);
+  }
+  ok('矮窗口下每篇文章的目录第一条都点得到',
+    posts.length > 0 && unreachable.length === 0,
+    `${posts.length} 篇，点不到的 ${unreachable.length}${unreachable.length ? '：' + unreachable.join(' ') : ''}`);
+
   await page.setViewportSize({ width: 1280, height: 900 });
 }
 

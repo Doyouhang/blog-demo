@@ -138,6 +138,13 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
   .toc-rail {
     position: fixed; left: calc(50% - 545px); top: 50%; transform: translateY(-50%);
     display: none; flex-direction: column; gap: 2px; z-index: 5; padding: 6px 0;
+    /* 章节多的文章要能滚。刻度栏是垂直居中的固定定位，一旦比视口高，
+       上半截会被顶到屏幕外、或者钻进吸顶页眉底下 —— 不是「看不全」，是点不到。
+       《人类简史》18 章约 514px，1160px 宽的笔记本视口高度常常只有 700 上下。
+       上限按「视口减固定留白」算而不是按比例：居中之后上下各剩 70px，
+       比页眉高，跟视口多矮无关。用 vh 比例的话矮窗口下余量会跟着缩，白留隐患。 */
+    max-height: calc(100vh - 140px); overflow-y: auto;
+    overscroll-behavior: contain; scrollbar-width: thin;
   }
   .toc-rail a {
     display: flex; align-items: center; gap: 10px; height: 26px;
