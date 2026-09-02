@@ -225,6 +225,8 @@ main { padding: 40px 0 60px; }
   display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
   color: var(--muted); margin-bottom: 10px;
 }
+/* 「← 返回博客」这类是可点的，净高 21px 不够 24 */
+a.eyebrow { padding: 3px 0; margin-bottom: 7px; }
 a.eyebrow:hover { color: var(--accent); text-decoration: none; }
 .page-head h1 { font-size: 34px; margin: 0; letter-spacing: -0.02em; line-height: 1.25; }
 .page-head .lead { margin: 12px 0 0; color: var(--muted); max-width: 46em; }
@@ -279,6 +281,8 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
 .spark i.up { background: var(--up); opacity: .75; }
 .spark i.down { background: var(--down); opacity: .75; }
 .side-foot { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+/* 侧栏脚注里的「看全部 →」「年回顾 →」净高才 14px */
+.side-foot a { display: inline-block; padding: 5px 0; }
 
 /* 兴趣卡：图标底衬和 demo 页头部一致，列表页和详情页是同一套语言 */
 .interest-grid {
@@ -373,7 +377,8 @@ article h1 { font-size: 30px; margin-bottom: 6px; line-height: 1.35; }
   margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);
 }
 .post-nav-label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
-.post-nav a { font-weight: 600; }
+/* 上一篇 / 下一篇的标题净高 19px，不到 24 */
+.post-nav a { font-weight: 600; display: inline-block; padding: 3px 0; }
 .post-nav-next { text-align: right; }
 
 footer.site {
@@ -585,7 +590,10 @@ footer.site {
   letter-spacing: 0.14em; color: var(--muted); font-weight: 700;
 }
 .toc ol { margin: 0; padding-left: 20px; }
-.toc li { margin: 5px 0; font-size: 14px; }
+/* 目录项原来净高 16px，不到 WCAG 2.2 要求的 24。
+   padding 顶替原来的 margin，总行高不变，只是可点范围铺满了 */
+.toc li { margin: 0; font-size: 14px; }
+.toc li a { display: inline-block; padding: 5px 0; }
 
 /* colophon 色板 */
 .swatches { display: inline-flex; gap: 5px; }
@@ -626,7 +634,7 @@ footer.site {
   --bg: #f5f3ee;
   --bg-elev: rgba(245, 243, 238, 0.9);
   --fg: #23262b;
-  --muted: #6f6b60;
+  --muted: #6a6659;   /* 4.76 / 5.50 / 5.18（色带 / 卡片 / 页底）；原来 #6f6b60 在色带上只有 4.41 */
   --accent: #2f4d7e;
   --accent-fg: #f5f3ee;
   --accent-weak: #e9edf4;

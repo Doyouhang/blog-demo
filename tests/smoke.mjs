@@ -375,6 +375,32 @@ if (zhWord) {
 const rNone = await doSearch('zzzzqqqq');
 ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
 
+// 代码块里每一种 token 颜色都要够读。github-dark 自带的注释色在 #24292e 上
+// 只有 3.05，构建期换成了 #8B949E —— 这里不写死颜色，直接量每种颜色的对比度，
+// 换主题、加语言、Shiki 升级都拦得住。
+{
+  await page.goto(BASE + '/blog/astro-github-pages/', { waitUntil: 'networkidle' });
+  const bad = await page.evaluate(() => {
+    const lum = (c) => { const v = c.map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+    const P = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const bgOf = (x) => { let n = x; while (n) { const c = getComputedStyle(n).backgroundColor;
+      if (c && !/rgba\(0, 0, 0, 0\)/.test(c)) return c; n = n.parentElement; } return 'rgb(255,255,255)'; };
+    const seen = new Map();
+    for (const el of document.querySelectorAll('pre *')) {
+      if (el.children.length || !el.textContent.trim()) continue;
+      const cs = getComputedStyle(el);
+      if (seen.has(cs.color)) continue;
+      const a = lum(P(cs.color)), b = lum(P(bgOf(el)));
+      const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      seen.set(cs.color, { r: +r.toFixed(2), sample: el.textContent.trim().slice(0, 14) });
+    }
+    return [...seen.values()].filter((x) => x.r < 4.5);
+  });
+  ok('代码块每种颜色都够读（≥4.5）', bad.length === 0,
+    bad.length ? bad.map((b) => `${b.r} 「${b.sample}」`).join(' | ') : '全部达标');
+}
+
 // 衬线字体是子集自托管的，只收了标题 / 引用块这些真正走衬线的字。
 // 将来谁把 var(--font-display) 用到别处，那些字不在子集里就会逐字掉回宋体 ——
 // 同一行两种字体，页面照样 200，控制台一声不吭。所以拿真实渲染结果去比对字表。

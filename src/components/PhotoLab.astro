@@ -61,6 +61,10 @@ const presets = [
   </div>
 
   <style>
+  /* 原生 range 默认净高 22px，差 2px 到 WCAG 2.2 的 24。
+     加高度不改轨道粗细，只是把可拖区域撑够 */
+  input[type='range'] { height: 26px; }
+
     .photo-frame {
       border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
       background: #0f172a;

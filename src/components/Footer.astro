@@ -6,7 +6,12 @@ const B = import.meta.env.BASE_URL;
   <div class="container">
     <p>
       <span class="seal seal-sm" aria-hidden="true">迩</span>© {year} 迩迩的小站 · 用 Astro 构建 · 托管于 GitHub Pages ·
-      <a href={`${B}rss.xml`}>RSS 订阅</a>
+      <a class="feed" href={`${B}rss.xml`}>RSS 订阅</a>
     </p>
   </div>
 </footer>
+
+<style>
+  /* 净高 16px，不到 WCAG 2.2 的 24 */
+  .feed { display: inline-block; padding: 5px 0; }
+</style>
