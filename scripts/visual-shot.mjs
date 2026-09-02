@@ -4,17 +4,14 @@
 //   --capture-only  只截图到 tests/visual/actual/（CI 上传 artifact 人工对比；
 //                   CI 与本地渲染环境字体/抗锯齿不同，不在 CI 做像素比对）
 import { chromium } from 'playwright-core';
-import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
-import { at } from './site-base.mjs';
+import { startPreview } from './preview-server.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.VISUAL_PORT ?? 4355);
-// base 只有 scripts/site-base.mjs 一处说了算，那里写着这个坑的来龙去脉
-const BASE = at(`http://127.0.0.1:${PORT}`);
 const DIR = path.join(ROOT, 'tests', 'visual');
 const mode = process.argv[2] ?? '--check';
 const CHROME = process.env.CHROME_PATH || '/usr/bin/google-chrome';
@@ -27,14 +24,10 @@ const PAGES = [
   ['interests', '/interests/'],
 ];
 
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], {
-  cwd: ROOT, stdio: 'ignore', detached: true,
+// preview 起不来会自己打印原因并退出，这里不用再判一次
+const { base: BASE, stop } = await startPreview({
+  port: PORT, label: 'visual', root: ROOT, portEnv: 'VISUAL_PORT',
 });
-const stop = () => { try { process.kill(-server.pid, 'SIGTERM'); } catch { /* 已退 */ } };
-process.on('exit', stop);
-const ready = async () => { try { return (await fetch(BASE + '/')).ok; } catch { return false; } };
-for (let i = 0; i < 60 && !(await ready()); i++) await new Promise((r) => setTimeout(r, 300));
-if (!(await ready())) { console.error('[visual] preview 没起来'); stop(); process.exit(1); }
 
 const browser = await chromium.launch({ executablePath: CHROME });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });

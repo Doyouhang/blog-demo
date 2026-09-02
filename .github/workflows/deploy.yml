@@ -48,13 +48,21 @@ jobs:
           CHROME_PATH: /usr/bin/google-chrome
       # 视觉快照：CI 渲染环境与本地字体/抗锯齿不同，不做像素比对，
       # 只截图上传 artifact 供人工对比；本地回归用 npm run test:visual。
+      #
+      # continue-on-error：这一步只是取证，不判定站点对错 —— 对错由上面的
+      # 冒烟测试把关。让一个截图步骤拦住部署，等于用工具链的毛病扣住能用的站。
+      # 失败仍然会在 Actions 里显示成橙色、日志照样留着，不会被吞掉。
       - name: Visual snapshots
         run: npm run test:visual -- --capture-only
+        continue-on-error: true
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: visual-snapshots
           path: tests/visual/actual
+          if-no-files-found: warn
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
