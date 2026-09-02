@@ -567,10 +567,6 @@ footer.site {
   src: url('../fonts/paper-serif-bold.woff2') format('woff2');
   font-weight: 700; font-style: normal; font-display: swap;
 }
-:root {
-  --font-display: 'PaperSerif', 'Noto Serif SC', 'Source Han Serif SC', 'Noto Serif CJK SC',
-    'Songti SC', 'STSong', 'SimSun', Georgia, 'Times New Roman', serif;
-}
 
 /* 跳转链接：平时隐藏，Tab 聚焦时落到左上角 */
 .skip-link {
@@ -661,7 +657,10 @@ footer.site {
   --radius: 6px;
   --bg-soft: #edeade;
 
-  --font-display: "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK SC",
+  /* PaperSerif 是 src/fonts/ 里子集自托管的那两个 woff2（见 scripts/build-fonts.mjs）。
+     这个变量**只能在这里定义一处** —— 之前 @font-face 那边另起了一个裸 :root 又写了一遍，
+     同特异性后者胜，PaperSerif 被这一行顶掉，浏览器一次都没请求过字体文件。 */
+  --font-display: 'PaperSerif', "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK SC",
     "Songti SC", "STSong", "SimSun", Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }

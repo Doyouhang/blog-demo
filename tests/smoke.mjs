@@ -374,13 +374,19 @@ if (zhWord) {
 const rNone = await doSearch('zzzzqqqq');
 ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
 
-// RSS 与 robots.txt：发现性基础
-const feedRes = await page.goto(BASE + '/rss.xml');
+// RSS：长文 + 闪念合流，阅读器定时来取。
+// 用 request 取而不是 page.goto —— 导航到 XML 文档时页面没有 <link rel=icon>，
+// 浏览器会去探源站根的 /favicon.ico，而站挂在 /blog-demo/ 下那里是 404，
+// 最后那条「无 JS 报错」就被这个 404 带红了。本地 base=/ 时命中 200，测不出来。
+const feedRes = await page.request.get(BASE + '/rss.xml');
 const feedTxt = feedRes.ok() ? await feedRes.text() : '';
 ok('RSS feed 可访问且格式正确', feedRes.ok() && feedTxt.includes('<rss') && feedTxt.includes('<item>'), `status ${feedRes.status()}`);
-const robotsRes = await page.goto(BASE + '/robots.txt');
-const robotsTxt = robotsRes.ok() ? await robotsRes.text() : '';
-ok('robots.txt 带 Sitemap', robotsRes.ok() && robotsTxt.includes('Sitemap:'), (robotsTxt.trim().split('\n').pop() ?? '').slice(0, 60));
+// 闪念在 feed 里是深链到某一条（#日期），锚点断了订阅点进来只会落到页顶
+const anchors = [...feedTxt.matchAll(/<link>[^<]*\/sparks\/#([\d-]+)<\/link>/g)].map((m) => m[1]);
+await page.goto(BASE + '/sparks/');
+const missing = await page.evaluate((ids) => ids.filter((id) => !document.getElementById(id)), anchors);
+ok('feed 里闪念的锚点都能落地', anchors.length > 0 && missing.length === 0,
+  `${anchors.length} 条，断的 ${missing.length}`);
 
 ok('运行期间无 JS 报错', errors.length === 0, errors.slice(0, 3).join(' | '));
 
