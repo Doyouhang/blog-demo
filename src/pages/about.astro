@@ -54,19 +54,6 @@ const B = import.meta.env.BASE_URL;
           </div>
         </section>
         <section class="side-box">
-          <h2>Colophon</h2>
-          <div class="side-row"><span>标题字</span><span class="side-val">PaperSerif</span></div>
-          <div class="side-row"><span>正文字</span><span class="side-val">系统无衬线</span></div>
-          <div class="side-row"><span>戳记</span><span class="side-val">等宽</span></div>
-          <div class="side-row">
-            <span>配色</span>
-            <span class="side-val swatches">
-              <i style="--c:#f5f3ee" title="纸 #f5f3ee"></i><i style="--c:#23262b" title="墨 #23262b"></i><i style="--c:#2f4d7e" title="藏青 #2f4d7e"></i><i style="--c:#bf3b2b" title="朱红 #bf3b2b"></i>
-            </span>
-          </div>
-          <p class="side-foot">衬线取 Noto Serif SC 子集自托管。</p>
-        </section>
-        <section class="side-box">
           <h2>站点</h2>
           <div class="side-row"><span>框架</span><span class="side-val">Astro</span></div>
           <div class="side-row"><span>托管</span><span class="side-val">GitHub Pages</span></div>
@@ -79,5 +66,14 @@ const B = import.meta.env.BASE_URL;
         </section>
       </aside>
     </div>
+
+    <p class="colophon">
+      <span class="colophon-word">Colophon</span>
+      标题字 <b>PaperSerif</b> · 正文字 <b>系统无衬线</b> · 戳记 <b>等宽</b> · 配色
+      <span class="swatches">
+        <i style="--c:#f5f3ee" title="纸 #f5f3ee"></i><i style="--c:#23262b" title="墨 #23262b"></i><i style="--c:#2f4d7e" title="藏青 #2f4d7e"></i><i style="--c:#bf3b2b" title="朱红 #bf3b2b"></i>
+      </span>
+      · 衬线取 Noto Serif SC 子集自托管
+    </p>
   </div>
 </BaseLayout>
