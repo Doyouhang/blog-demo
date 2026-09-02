@@ -1,0 +1,101 @@
+---
+import InterestLayout from '../../../layouts/InterestLayout.astro';
+import ItemCard from '../../../components/ItemCard.astro';
+import DemoToggle from '../../../components/DemoToggle.astro';
+import DoughCalc from '../../../components/DoughCalc.astro';
+import { getCollection } from 'astro:content';
+import { cstYear } from '../../../utils/cst';
+
+const B = import.meta.env.BASE_URL;
+
+const all = (await getCollection('items', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+const dishes = all.filter((i) => i.data.kind === 'dish');
+const tastes = all.filter((i) => i.data.kind === 'taste');
+
+const notes = (await getCollection('essays', ({ data }) => !data.draft && data.topic === 'food')).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+
+// 两个分区。空的那一段不渲染 —— 一上来两个「还没有内容」的空壳子最难看
+const SECTIONS = [
+  { key: 'dish', label: '日常下厨', note: '自己做的', list: dishes },
+  { key: 'taste', label: '路上吃到的', note: '出门尝到的特色', list: tastes },
+].filter((s) => s.list.length > 0);
+
+const thisYear = new Date().getFullYear();
+const cookedThisYear = dishes.filter((d) => cstYear(d.data.date) === thisYear).length;
+// 去过几个地方：taste 的地点去重。没填地点的不算
+const places = new Set(tastes.map((t) => t.data.place?.trim()).filter(Boolean));
+
+const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
+---
+<InterestLayout
+  wide
+  icon="pot"
+  title="美食"
+  description="自己做的记在下厨，出门吃到的记在路上。值得说几句的单写一篇。"
+>
+  <div class="split">
+    <div class="split-main">
+      {all.filter((i) => i.data.kind === 'dish' || i.data.kind === 'taste').length === 0 ? (
+        <p class="empty">
+          还没有记录。在 <code>src/content/items/</code> 加一个 <code>kind: dish</code>
+          （自己做的）或 <code>kind: taste</code>（在外面吃到的）的文件即可，
+          用 studio 加更快。
+        </p>
+      ) : (
+        SECTIONS.map((s) => (
+          <section class="shelf">
+            <div class="sec-hd">
+              <h2>{s.label}</h2>
+              <span class="sec-note">{s.list.length} 道 · {s.note}</span>
+            </div>
+            {s.list.map((i) => <ItemCard item={i} essayHref={hrefOf(i.data.essay?.id)} />)}
+          </section>
+        ))
+      )}
+    </div>
+
+    <aside>
+      <section class="side-box">
+        <h2>今年</h2>
+        <div class="side-row"><span>下厨</span><span class="side-val">{cookedThisYear} 道</span></div>
+        <div class="side-row"><span>路上吃到</span><span class="side-val">{tastes.length} 道</span></div>
+        {places.size > 0 && (
+          <div class="side-row"><span>去过</span><span class="side-val">{places.size} 个地方</span></div>
+        )}
+      </section>
+
+      <section class="side-box">
+        <h2>写过的</h2>
+        {notes.length === 0 ? (
+          <p class="side-foot">还没写过。写一篇 <code>topic: food</code> 的长文就会出现在这里。</p>
+        ) : (
+          <>
+            {notes.map((e) => (
+              <div class="side-row">
+                <a href={`${B}blog/${e.id}/`}>{e.data.title}</a>
+              </div>
+            ))}
+            <p class="side-foot">共 {notes.length} 篇</p>
+          </>
+        )}
+      </section>
+    </aside>
+  </div>
+
+  <DemoToggle icon="bowl" label="顺手玩玩：面食配比计算器">
+    <DoughCalc />
+  </DemoToggle>
+</InterestLayout>
+
+<style>
+  .shelf + .shelf { margin-top: 28px; }
+  .empty { color: var(--muted); font-size: 14px; line-height: 1.9; }
+  .empty code, .side-foot code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+  }
+</style>

@@ -25,6 +25,15 @@ const raiseCommentContrast = {
 
 export default defineConfig({
   base: BASE,
+  // 「下厨」改名成「美食」，路由跟着从 /interests/cooking/ 挪到 /interests/food/。
+  // 静态站没有服务端发 301，Astro 会生成一个跳转页 —— 老链接不至于变成 404。
+  //
+  // 键（来源路径）Astro 会自己补 base，值（目标地址）**不会** ——
+  // 它原样写进 meta refresh。所以这里必须手动带上 base，否则项目页上
+  // 会跳到 https://用户名.github.io/interests/food/，那是另一个站的 404。
+  // 本地默认 base='/'，两种写法都对，这个错只在线上出现。第五次栽在同一处了。
+  // 带不带尾斜杠会被归一成同一条路由，写两遍算重复定义。
+  redirects: { '/interests/cooking': `${BASE.replace(/\/$/, '')}/interests/food/` },
   markdown: {
     shikiConfig: { theme: 'github-dark', transformers: [raiseCommentContrast] },
   },

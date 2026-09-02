@@ -41,8 +41,8 @@ export const interests: Interest[] = [
     tags: ['前端', '自动化'],
   },
   {
-    icon: 'pot', slug: 'cooking', title: '下厨',
-    desc: '周末研究点家常菜。',
-    tags: ['家常'],
+    icon: 'pot', slug: 'food', title: '美食',
+    desc: '自己做的，和在路上吃到的。',
+    tags: ['下厨', '旅途'],
   },
 ];

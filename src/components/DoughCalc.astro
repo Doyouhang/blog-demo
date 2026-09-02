@@ -1,6 +1,7 @@
 ---
-import InterestLayout from '../../../layouts/InterestLayout.astro';
-import Icon from '../../../components/Icon.astro';
+// 面食配比计算器。原来是「下厨」页的全部内容，改成美食模块之后它让位给记录，
+// 收进页尾的折叠里（和影视页的彩蛋同一种处理）。逻辑一行没动，只是换了个壳。
+import Icon from './Icon.astro';
 
 const doughs = [
   { hydration: 50, name: '手擀面' },
@@ -9,7 +10,6 @@ const doughs = [
   { hydration: 42, name: '刀削面' },
 ];
 ---
-<InterestLayout icon="pot" title="下厨" description="面食配比计算器：选个面种、输入面粉量，实时算出水和盐。">
   <div class="demo-card">
     <span class="demo-label" id="dough-label">面种（决定含水量）</span>
     <div class="demo-row" role="group" aria-labelledby="dough-label">
@@ -43,7 +43,7 @@ const doughs = [
   </style>
 
   <script>
-    import { onPageReady, markReady } from '../../../scripts/init';
+    import { onPageReady, markReady } from '../scripts/init';
 
     function initCookingDemo() {
       const card = document.querySelector<HTMLElement>('.demo-card');
@@ -98,4 +98,3 @@ const doughs = [
 
     onPageReady(initCookingDemo);
   </script>
-</InterestLayout>

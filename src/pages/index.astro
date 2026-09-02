@@ -29,8 +29,8 @@ const heroPhoto = heroMoment?.data.photos[0];
 
 // 兴趣格子上放真封面：三个有收藏的兴趣各取最近一条。
 // 剩下三个没有条目可取，退回图标 —— 六个格子的高度仍然一致
-const KIND_OF: Record<string, 'book' | 'movie' | 'song'> = {
-  reading: 'book', watching: 'movie', music: 'song',
+const KIND_OF: Record<string, 'book' | 'movie' | 'song' | 'dish'> = {
+  reading: 'book', watching: 'movie', music: 'song', food: 'dish',
 };
 const latestOf = (slug: string) => {
   const kind = KIND_OF[slug];

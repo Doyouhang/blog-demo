@@ -311,14 +311,33 @@ function shows(f) {
   return Array.isArray(want) ? want.map(String).includes(now) : now === String(want);
 }
 
+// 同一个字段在不同类型下叫法不一样：creator 对书是「作者」，对菜是「菜系」。
+// 写成 labelWhen: { kind: { dish: '菜系', taste: '店家' } }，没命中就用默认 label。
+function labelOf(f) {
+  if (!f.labelWhen) return f.label;
+  const [k, map] = Object.entries(f.labelWhen)[0];
+  return map[String(cur.front[k] ?? '')] ?? f.label;
+}
+
+// 封面搜索只对有封面源的类型有意义（书 / 音乐 / 影视）。
+// 菜去搜只会搜回一堆同名的书和电影 —— 按钮留在那里就是在骗人点。
+function canMatch() {
+  const t = S.types[cur.type];
+  if (!t.matchFrom) return false;
+  if (!t.matchWhen) return true;
+  const [k, want] = Object.entries(t.matchWhen)[0];
+  const now = String(cur.front[k] ?? '');
+  return Array.isArray(want) ? want.map(String).includes(now) : now === String(want);
+}
+
 function field(f) {
   const v = cur.front[f.key] ?? '';
   const req = f.required ? ' <span class="req">*</span>' : '';
   // 「按标题匹配信息」挂在 schema 指定的那个字段右上角 ——
   // 挨着标题点，比翻到下面封面栏里再点直观
-  const action = f.key === (S.types[cur.type].matchFrom ?? '')
+  const action = f.key === (S.types[cur.type].matchFrom ?? '') && canMatch()
     ? `<button type="button" id="cover-go" class="mini primary">按标题匹配信息</button>` : '';
-  const head = `<span class="f-label">${f.label}${req}${action}</span>`;
+  const head = `<span class="f-label">${labelOf(f)}${req}${action}</span>`;
   if (f.type === 'select')
     return `<label class="f">${head}<select data-k="${f.key}">${f.options
       .map((o) => `<option value="${o.v}"${String(v) === o.v ? ' selected' : ''}>${o.t}</option>`).join('')}</select></label>`;

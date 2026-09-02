@@ -577,6 +577,29 @@ ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').
     missing.size ? [...missing].slice(0, 8).map(([c, p]) => `${c}(${p})`).join(' ') : `字表 ${subset.size} 字`);
 }
 
+// ——— 美食页 ———
+await page.goto(BASE + '/interests/food/', { waitUntil: 'networkidle' });
+ok('美食页可访问', (await page.title()).includes('美食'), await page.title());
+ok('面食计算器收在折叠里', await page.locator('details.lab').count() === 1);
+// 收进折叠之后仍然要能用：折叠里的脚本初始化时机和页面上的不一样，
+// 这一步以前在别的页面上翻过车
+await page.click('details.lab summary');
+await page.waitForTimeout(200);
+const doughWorks = await page.evaluate(() => {
+  const out = document.getElementById('out');
+  return !!out && out.textContent.trim().length > 0;
+});
+ok('折叠里的面食计算器算得出结果', doughWorks);
+
+// 「下厨」改名「美食」，老链接要能跳过去。跳转目标是写死在 meta refresh 里的
+// 绝对路径，Astro 只给来源路径补 base，**不给目标补** —— 少了 base 就会跳到
+// 用户页根目录，那是另一个站的 404。而本地默认 base='/' 时两种写法都对，
+// 这个错只在线上出现，所以这里比的就是「带没带 base」。
+const redir = await page.request.get(BASE + '/interests/cooking/');
+const redirTarget = (((redir.ok() ? await redir.text() : '').match(/url=([^"']+)/)) ?? [])[1] ?? '';
+ok('老的下厨链接跳到美食页且带上了 base', redir.ok() && redirTarget === at('/interests/food/'),
+  `目标 ${redirTarget || '（没拿到）'}`);
+
 // RSS：长文 + 闪念合流，阅读器定时来取。
 // 用 request 取而不是 page.goto —— 导航到 XML 文档时页面没有 <link rel=icon>，
 // 浏览器会去探源站根的 /favicon.ico，而站挂在 /blog-demo/ 下那里是 404，

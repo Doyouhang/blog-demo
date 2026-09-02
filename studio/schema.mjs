@@ -32,23 +32,33 @@ export const TYPES = {
   },
   items: {
     label: '收藏',
-    hint: '听过的歌、读过的书、看过的片。想细说的另写长文，在这里关联过去。',
+    hint: '听过的歌、读过的书、看过的片、做过吃过的菜。想细说的另写长文，在这里关联过去。',
     dir: 'src/content/items',
     flat: true,
     // 侧栏列表按类型分组：书 / 音乐 / 影视 各成一段
     groupBy: 'kind',
     // 「按标题匹配信息」那个按钮挂在哪个字段的右上角
     matchFrom: 'title',
+    // 只有书 / 音乐 / 影视有封面源可搜。菜去搜只会搜回一堆同名的书和电影，
+    // 按钮留在那里就是在骗人点 —— 照片自己传。
+    matchWhen: { kind: ['book', 'song', 'movie'] },
     // 封面栏插在哪个字段后面（挨着作者，搜完信息顺手就看到图）
     coverAfter: 'creator',
     bodyLabel: '',
     bodyRequired: false,
     fields: [
       { key: 'kind', label: '类型', type: 'select', required: true,
-        options: [{ v: 'book', t: '书' }, { v: 'song', t: '音乐' }, { v: 'movie', t: '影视' }] },
-      { key: 'title', label: '标题', type: 'text', required: true },
-      { key: 'creator', label: '作者 / 歌手 / 导演', type: 'text', required: true },
-      { key: 'date', label: '听到 / 读完 / 看完的时间', type: 'date', required: true },
+        options: [{ v: 'book', t: '书' }, { v: 'song', t: '音乐' }, { v: 'movie', t: '影视' },
+                  { v: 'dish', t: '下厨（自己做的）' }, { v: 'taste', t: '尝到（在外面吃的）' }] },
+      { key: 'title', label: '标题', type: 'text', required: true,
+        labelWhen: { kind: { dish: '菜名', taste: '这道菜叫什么' } } },
+      { key: 'creator', label: '作者 / 歌手 / 导演', type: 'text', required: true,
+        labelWhen: { kind: { dish: '菜系 / 做法来源', taste: '店家 / 摊位' } } },
+      { key: 'date', label: '听到 / 读完 / 看完的时间', type: 'date', required: true,
+        labelWhen: { kind: { dish: '哪天做的', taste: '哪天吃到的' } } },
+      // 只有在外面吃到的才需要记地点，自己在家做的不用
+      { key: 'place', label: '在哪吃的', type: 'text', onlyWhen: { kind: 'taste' },
+        placeholder: '成都 · 玉林路' },
       // 歌没有状态一说；书和影视共用一组，文案写成两边都读得通的
       { key: 'status', label: '状态', type: 'select', onlyWhen: { kind: ['book', 'movie'] },
         options: [{ v: '', t: '（不填，按已完成算）' }, { v: 'doing', t: '在读 / 在看' },
@@ -59,7 +69,8 @@ export const TYPES = {
       { key: 'noteMode', label: '这段文字', type: 'select', transient: true,
         options: [{ v: 'blurb', t: '短评（写在卡片上）' },
                   { v: 'essay', t: '长文（单独成篇，卡片上给链接）' }] },
-      { key: 'blurb', label: '一句话（卡片上显示）', type: 'textarea', required: true, rows: 2 },
+      { key: 'blurb', label: '一句话（卡片上显示）', type: 'textarea', required: true, rows: 2,
+        labelWhen: { kind: { dish: '一句话（做得怎么样）', taste: '一句话（好不好吃）' } } },
       { key: 'noteTitle', label: '长文标题', type: 'text', transient: true,
         onlyWhen: { noteMode: 'essay' }, placeholder: '留空就用《标题》观后' },
       { key: 'noteBody', label: '正文（Markdown）', type: 'textarea', transient: true,
@@ -84,7 +95,7 @@ export const TYPES = {
       { key: 'pubDate', label: '发布日期', type: 'date', required: true },
       { key: 'topic', label: '归属', type: 'select', required: true,
         options: [{ v: 'blog', t: '博客' }, { v: 'music', t: '音乐' }, { v: 'reading', t: '读书' },
-                  { v: 'watching', t: '影视' }, { v: 'cooking', t: '下厨' }, { v: 'coding', t: '代码' }] },
+                  { v: 'watching', t: '影视' }, { v: 'food', t: '美食' }, { v: 'coding', t: '代码' }] },
       { key: 'tags', label: '标签', type: 'tags' },
     ],
   },

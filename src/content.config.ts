@@ -13,23 +13,29 @@ const essays = defineCollection({
     title: z.string(),
     description: z.string(),
     pubDate: z.coerce.date(),
-    topic: z.enum(['blog', 'music', 'reading', 'watching', 'cooking', 'coding']).default('blog'),
+    topic: z.enum(['blog', 'music', 'reading', 'watching', 'food', 'coding']).default('blog'),
     tags: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
   }),
 });
 
-/** 收藏条目：歌、书、影视。加新类型只需扩 kind，页面各取各的。 */
+/**
+ * 收藏条目：歌、书、影视、菜。加新类型只需扩 kind，页面各取各的。
+ * 美食分两类：dish 是自己做的，taste 是在外面吃到的 —— 后者才有 place。
+ */
 const items = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/items' }),
   schema: ({ image }) =>
     z.object({
-      kind: z.enum(['song', 'book', 'movie']),
+      kind: z.enum(['song', 'book', 'movie', 'dish', 'taste']),
       title: z.string(),
       creator: z.string(),
       cover: image().optional(),
-      // 歌：听到的时间；书 / 影视：看完读完的时间，在读在看的用开始时间
+      // 歌：听到的时间；书 / 影视：看完读完的时间，在读在看的用开始时间；
+      // 菜：做的 / 吃到的那天
       date: z.coerce.date(),
+      // 只有 taste（旅途尝到的）用得上。自己在家做的不用记地点。
+      place: z.string().optional(),
       rating: z.number().min(1).max(5).optional(),
       blurb: z.string(),
       // 书架 / 片单分区用；歌不需要，留空即可

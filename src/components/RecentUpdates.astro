@@ -86,6 +86,8 @@ const KIND = {
   book: { label: '读书', page: 'reading' },
   movie: { label: '影视', page: 'watching' },
   song: { label: '音乐', page: 'music' },
+  dish: { label: '下厨', page: 'food' },
+  taste: { label: '尝到', page: 'food' },
 };
 
 interface Row {
@@ -104,7 +106,8 @@ const rows: Row[] = [
     })),
   ...items.map((i) => ({
     date: i.data.date, label: KIND[i.data.kind].label,
-    title: i.data.kind === 'song' ? i.data.title : `《${i.data.title}》`,
+    // 书名号只给作品用，菜名和歌名都不加
+    title: ['song', 'dish', 'taste'].includes(i.data.kind) ? i.data.title : `《${i.data.title}》`,
     note: flat(i.data.blurb), href: `${B}interests/${KIND[i.data.kind].page}/`,
     cover: i.data.cover, mark: 'essay' as MarkName,
   })),

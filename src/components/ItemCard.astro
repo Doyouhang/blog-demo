@@ -12,14 +12,25 @@ interface Props {
   essayHref?: string;
 }
 const { item, essayHref } = Astro.props;
-const { kind, title, creator, cover, date, rating, blurb, status } = item.data;
+const { kind, title, creator, cover, date, rating, blurb, status, place } = item.data;
+
+// 书名号只给作品用。菜名不是作品名，《红烧肉》读起来是个笑话。
+const isFood = kind === 'dish' || kind === 'taste';
+const heading = isFood || kind === 'song' ? title : `《${title}》`;
+// 书和影视的封面是 2:3 的竖版，菜是照片，横的方的都有 ——
+// 硬套 2:3 会把菜压成一条。用图片自己的比例，同时也避免加载前后的跳动。
+const coverH = cover && isFood ? Math.round((160 * cover.height) / cover.width) : 213;
 
 // 同一组状态，书和影视的说法不一样；歌没有状态
 const STATUS_LABEL = {
   book: { want: '想读', doing: '在读', done: '读完' },
   movie: { want: '想看', doing: '在看', done: '看完' },
 } as const;
-const statusLabel = status ? STATUS_LABEL[kind === 'movie' ? 'movie' : 'book'][status] : null;
+// 菜没有「想吃 / 在吃」这一说，状态只对书和影视有意义
+const statusLabel =
+  status && (kind === 'book' || kind === 'movie')
+    ? STATUS_LABEL[kind === 'movie' ? 'movie' : 'book'][status]
+    : null;
 
 // blurb 名义上是「一句话」，实际难免有人往里写一整篇。
 // 换行必须保留（敲了回车就该断行），但整篇铺开会把片单撑成一条长溜，
@@ -33,16 +44,22 @@ const when = cstYearMonth(date);
 <article class:list={['item', !cover && 'item-bare']}>
   {cover && (
     <div class="item-cover">
-      <Image src={cover} alt={`《${title}》${kind === "movie" ? "海报" : "封面"}`} width={160} height={213} />
+      <Image
+        src={cover}
+        alt={isFood ? `${title}的照片` : `《${title}》${kind === 'movie' ? '海报' : '封面'}`}
+        width={160}
+        height={coverH}
+      />
     </div>
   )}
   <div class="item-body">
     <h3>
-      {kind === 'song' ? title : `《${title}》`}
+      {heading}
       {statusLabel && <span class="badge">{statusLabel}</span>}
     </h3>
     <p class="meta">
       <span>{creator}</span>
+      {place && <span>{place}</span>}
       <span class="dot">·</span>
       <span>{when}</span>
       {rating != null && (
