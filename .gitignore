@@ -2,6 +2,7 @@ node_modules
 dist
 .astro
 .DS_Store
+tests/visual/actual
 
 # Pagefind 的搜索索引是构建产物，跟着 dist 走
 dist/pagefind/
