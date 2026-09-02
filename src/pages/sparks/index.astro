@@ -13,14 +13,9 @@ const all = (await getCollection('sparks', ({ data }) => !data.draft)).sort(
 // render() 只能在页面这层 await，组件里做不了
 const rendered = await Promise.all(
   all.map(async (s) => {
-    const body = s.body ?? '';
-    return {
-      spark: s,
-      Content: (await render(s)).Content,
-      // 绝大多数闪念就一两句；偶尔一条长的会把整条时间线撑断，折起来
-      long: body.replace(/\s/g, '').length > 200,
-      peek: (body.split('\n').find((l) => l.trim()) ?? '').trim(),
-    };
+    // 长短不在这里判断：「超过三行」取决于渲染出来的行数，跟窗口宽度有关，
+    // 构建期算不出来。交给浏览器量，见页面底部的脚本。
+    return { spark: s, Content: (await render(s)).Content };
   })
 );
 
@@ -50,23 +45,19 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
         {[...groups].map(([month, list]) => (
           <section class="month">
             <h2 class="month-hd">{month}</h2>
-            {list.map(({ spark, Content, long, peek }) => (
+            {list.map(({ spark, Content }) => (
               <article class="jot" id={cstISODate(spark.data.date)}>
                 <div class="when">
                   <span class="d">{cstMonthDay(spark.data.date)}</span>
                   {cstTime(spark.data.date) && <span class="t">{cstTime(spark.data.date)}</span>}
                 </div>
-                {long ? (
-                  <details class="fold">
-                    <summary>
-                      <span class="peek">{peek.length > 34 ? peek.slice(0, 34) + '…' : peek}</span>
-                      <span class="fold-hint"></span>
-                    </summary>
-                    <div class="body"><Content /></div>
-                  </details>
-                ) : (
+                {/* 折叠是脚本按实际行数决定的。服务端一律整段渲染 ——
+                    脚本没跑起来，看到的就是全文，不会缺内容。
+                    按钮默认 hidden，只有真的超过三行才露出来。 */}
+                <div class="say">
                   <div class="body"><Content /></div>
-                )}
+                  <button class="more" type="button" aria-expanded="false" hidden></button>
+                </div>
               </article>
             ))}
           </section>
@@ -111,18 +102,29 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
   .body :global(p) { margin: 0; white-space: pre-wrap; }
   .body :global(p + p) { margin-top: 14px; }
 
-  /* 折叠：和收藏卡片的长短评用同一套手势 */
-  .fold summary {
-    cursor: pointer; list-style: none; display: flex; gap: 8px;
-    align-items: baseline; flex-wrap: wrap;
-    font-size: 15px; line-height: 1.9; color: var(--muted);
+  /* ===== 超过三行折起来，悬停滑开 =====
+     阈值用 lh 单位（1lh = 一个行高），跟着行高走，不用手算像素，
+     改字号或行距也不会失准。 */
+  .say { min-width: 0; }
+  :global(html.jot-fold) .clamped .body {
+    max-block-size: 3lh; overflow: clip;
+    /* max-block-size 从固定值过渡到 max-content 需要 interpolate-size，
+       少了它是「跳」不是「滑」 */
+    interpolate-size: allow-keywords;
+    transition: max-block-size var(--dur) var(--ease);
   }
-  .fold summary::-webkit-details-marker { display: none; }
-  .fold .fold-hint { color: var(--accent); font-size: 13px; white-space: nowrap; }
-  .fold .fold-hint::after { content: '展开'; }
-  .fold[open] .fold-hint::after { content: '收起'; }
-  .fold[open] .peek { display: none; }
-  .fold[open] summary { margin-bottom: 10px; }
+  :global(html.jot-fold) .clamped.open .body { max-block-size: max-content; }
+
+  .more {
+    display: none; margin-top: 6px; padding: 4px 0;
+    background: none; border: 0; cursor: pointer;
+    color: var(--seal); font: inherit; font-size: 13px;
+  }
+  .more::after { content: '展开'; }
+  .clamped.open .more::after { content: '收起'; }
+  :global(html.jot-fold) .clamped .more { display: inline-block; }
+  .more:hover { text-decoration: underline; }
+  .more:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 
   .years {
     display: flex; flex-wrap: wrap; gap: 14px;
@@ -150,16 +152,6 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
   .jot:hover::after { background: var(--bg-soft); }
   .when { transition: color var(--dur-fast) var(--ease); }
   .jot:hover .when { color: var(--seal); }
-
-  /* ===== 展开/收起做成滑动 ===== */
-  /* interpolate-size 是可继承属性，写在 .fold 上就够，::details-content 会继承。
-     少了它，block-size 到 auto 不可插值，展开是「跳」不是「滑」。 */
-  .fold { interpolate-size: allow-keywords; }
-  .fold :global(::details-content) {
-    block-size: 0; overflow: clip;
-    transition: block-size var(--dur) var(--ease), content-visibility var(--dur) allow-discrete;
-  }
-  .fold[open] :global(::details-content) { block-size: auto; }
 
   /* ===== 进场：整条淡入上浮，日期左边的灯泡错开 80ms 再亮 ===== */
   /* 读起来是「内容到位，然后灵感一闪」，两件事同时发生反而糊成一团。
@@ -195,7 +187,8 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
   /* 系统说要减弱动态效果：脚本压根不会加 jot-motion，这里再兜一层，
      把悬停和展开的过渡也一并停掉 */
   @media (prefers-reduced-motion: reduce) {
-    .jot::after, .when, .fold :global(::details-content) { transition: none; }
+    .jot::after, .when { transition: none; }
+    :global(html.jot-fold) .clamped .body { transition: none; }
     :global(html.jot-motion) .jot { opacity: 1; transform: none; transition: none; }
     :global(html.jot-motion) .jot.seen .when::before { animation: none; }
   }
@@ -264,9 +257,79 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
     };
     addEventListener('scroll', onScroll, { passive: true });
     addEventListener('resize', onScroll, { passive: true });
-    // 展开长条目会把下面的条目整体推走，位置变了要重算。toggle 不冒泡，得用捕获
-    stream!.addEventListener('toggle', onScroll, true);
     sweep();
+
+    initFold(stream!, items, onScroll);
   }
+
+  /**
+   * 超过三行就折起来，鼠标悬停自动滑开。
+   *
+   * 「三行」只有浏览器知道 —— 同一段话在宽屏是两行、窄屏是五行，构建期算不出来，
+   * 所以判断放在这里，并且 resize 之后要重算。
+   *
+   * 折叠态只在 html.jot-fold 下生效，而这个类是脚本加的：脚本没跑、报错、被拦，
+   * 看到的就是全文。折叠坏掉的代价只能是「没折叠」，不能是「内容被切掉」。
+   */
+  function initFold(stream: HTMLElement, items: HTMLElement[], onLayoutChange: () => void) {
+    const LINES = 3;
+    const OPEN_DELAY = 120;   // 鼠标扫过时别乱开
+    const CLOSE_DELAY = 200;  // 手抖出界一下别立刻合上
+    // 触摸设备没有悬停，只能靠按钮；用 hover 媒体查询判断，比嗅探 UA 可靠
+    const canHover = matchMedia('(hover: hover)').matches;
+    document.documentElement.classList.add('jot-fold');
+
+    for (const jot of items) {
+      const body = jot.querySelector('.body') as HTMLElement | null;
+      const btn = jot.querySelector('.more') as HTMLButtonElement | null;
+      if (!body || !btn) continue;
+
+      let pinned = false;
+      let openT = 0, closeT = 0;
+
+      const setOpen = (on: boolean) => {
+        jot.classList.toggle('open', on);
+        btn.setAttribute('aria-expanded', String(on));
+        // 高度变了，下面条目的位置跟着变，进场动效要重算
+        onLayoutChange();
+      };
+
+      // 量的是「整段有多高」对比「三行有多高」，和当前展开与否无关 ——
+      // 用 scrollHeight > clientHeight 判断的话，展开状态下永远是 false，
+      // resize 之后会把该折的条目误判成不用折。
+      const measure = () => {
+        const lh = parseFloat(getComputedStyle(body).lineHeight) || 0;
+        const need = lh > 0 && body.scrollHeight > lh * LINES + 2;
+        jot.classList.toggle('clamped', need);
+        btn.hidden = !need;
+        if (!need) { pinned = false; setOpen(false); }
+      };
+      measure();
+      // 字体换成自托管的那一刻行高会变，量早了会差一行
+      document.fonts?.ready.then(measure);
+      addEventListener('resize', measure, { passive: true });
+
+      btn.addEventListener('click', () => {
+        clearTimeout(openT); clearTimeout(closeT);
+        const next = !jot.classList.contains('open');
+        pinned = next;   // 点开就钉住，鼠标移开也不收
+        setOpen(next);
+      });
+
+      if (canHover) {
+        jot.addEventListener('mouseenter', () => {
+          if (pinned || !jot.classList.contains('clamped')) return;
+          clearTimeout(closeT);
+          openT = window.setTimeout(() => setOpen(true), OPEN_DELAY);
+        });
+        jot.addEventListener('mouseleave', () => {
+          clearTimeout(openT);
+          if (pinned) return;
+          closeT = window.setTimeout(() => setOpen(false), CLOSE_DELAY);
+        });
+      }
+    }
+  }
+
   onPageReady(initJots);
 </script>

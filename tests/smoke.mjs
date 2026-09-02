@@ -221,10 +221,28 @@ ok('闪念的换行会保留 — pre-wrap', jotWrap);
 // 只写了日期的存 T00:00:00+08:00，页面靠这个哨兵只显示日期
 const times = await page.locator('.jot .when .t').count();
 ok('写了时刻的显示时刻，没写的不显示', times > 0 && times < jots, `${times}/${jots}`);
-const foldBefore = await page.locator('details.fold').first().evaluate((e) => e.open);
-await page.click('details.fold summary');
-const foldAfter = await page.locator('details.fold').first().evaluate((e) => e.open);
-ok('超长的那条默认折起、点开能展开', foldBefore === false && foldAfter === true);
+// 超过三行的折起来。「三行」只有浏览器知道 —— 同一段话宽屏两行、窄屏五行，
+// 构建期算不出来。所以这里量的是真实高度，不是「有没有那个 class」。
+const fold = await page.evaluate(() => {
+  const j = document.querySelector('.jot.clamped');
+  if (!j) return null;
+  const b = j.querySelector('.body');
+  const lh = parseFloat(getComputedStyle(b).lineHeight);
+  return { shown: b.clientHeight, three: lh * 3, full: b.scrollHeight };
+});
+ok('超过三行的默认折到三行', fold !== null && Math.abs(fold.shown - fold.three) < 3,
+  fold ? `显示 ${Math.round(fold.shown)}px / 三行 ${Math.round(fold.three)}px / 全文 ${fold.full}px` : '没有需要折叠的条目');
+await page.click('.jot.clamped .more');
+await page.waitForTimeout(400);
+const opened = await page.evaluate(() => {
+  const b = document.querySelector('.jot.clamped .body');
+  return b.clientHeight >= b.scrollHeight - 2;
+});
+ok('点开能展开全文', opened);
+// 三行以内的不该有折叠按钮，否则点了什么都不会发生
+const strayBtn = await page.evaluate(() =>
+  [...document.querySelectorAll('.jot:not(.clamped) .more')].filter((b) => !b.hidden).length);
+ok('三行以内的不给折叠按钮', strayBtn === 0, `多余按钮 ${strayBtn} 个`);
 
 // 进场动效：脚本只负责打 .seen，动画交给 CSS。三件事要同时成立，缺一件都算坏：
 //   ① 屏外的条目确实是隐藏态 —— 否则动效等于不存在（第一版就是这样：
