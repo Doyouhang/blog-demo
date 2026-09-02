@@ -9,15 +9,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
+import { at } from './site-base.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.VISUAL_PORT ?? 4355);
-// 站点可能挂在子路径下（项目页 SITE_BASE=/blog-demo/）。探测地址和页面地址
-// 都得带上它 —— 去探 http://127.0.0.1:4355/ 在 base 不是 / 的时候恒返回 404，
-// 于是「preview 没起来」，本地不设 SITE_BASE 必绿、CI 必红。
-// tests/run.mjs 当年同一个坑，这里照抄那套写法。
-const BASE_PATH = (process.env.SITE_BASE ?? '/').replace(/\/+$/, '');
-const BASE = `http://127.0.0.1:${PORT}${BASE_PATH}`;
+// base 只有 scripts/site-base.mjs 一处说了算，那里写着这个坑的来龙去脉
+const BASE = at(`http://127.0.0.1:${PORT}`);
 const DIR = path.join(ROOT, 'tests', 'visual');
 const mode = process.argv[2] ?? '--check';
 const CHROME = process.env.CHROME_PATH || '/usr/bin/google-chrome';

@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { readFileSync } from 'node:fs';
 
 const BASE = process.env.SMOKE_BASE || process.env.BASE_URL || 'http://localhost:4321';
 // 页面里的站内链接是带 base 的绝对路径（项目页 base=/blog-demo/）。
@@ -373,6 +374,29 @@ if (zhWord) {
 // 要测「无结果」分支得用真正不存在的字串。
 const rNone = await doSearch('zzzzqqqq');
 ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
+
+// 衬线字体是子集自托管的，只收了标题 / 引用块这些真正走衬线的字。
+// 将来谁把 var(--font-display) 用到别处，那些字不在子集里就会逐字掉回宋体 ——
+// 同一行两种字体，页面照样 200，控制台一声不吭。所以拿真实渲染结果去比对字表。
+{
+  const subset = new Set(readFileSync(new URL('../src/fonts/subset.txt', import.meta.url), 'utf8'));
+  const missing = new Map();
+  for (const p of ['/', '/blog/astro-github-pages/', '/about/', '/sparks/']) {
+    await page.goto(BASE + p, { waitUntil: 'networkidle' });
+    const chars = await page.evaluate(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('*')) {
+        if (el.children.length || !el.textContent.trim()) continue;
+        if (!getComputedStyle(el).fontFamily.startsWith('PaperSerif')) continue;
+        out.push(el.textContent);
+      }
+      return out.join('');
+    });
+    for (const ch of chars) if (!/\s/.test(ch) && !subset.has(ch)) missing.set(ch, p);
+  }
+  ok('衬线子集没漏字', missing.size === 0,
+    missing.size ? [...missing].slice(0, 8).map(([c, p]) => `${c}(${p})`).join(' ') : `字表 ${subset.size} 字`);
+}
 
 // RSS：长文 + 闪念合流，阅读器定时来取。
 // 用 request 取而不是 page.goto —— 导航到 XML 文档时页面没有 <link rel=icon>，

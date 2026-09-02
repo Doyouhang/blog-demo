@@ -557,15 +557,13 @@ footer.site {
 }
 
 /* == paper-ink theme == */
+/* 一个可变字重文件顶两个静态子集：wght 400-700 全覆盖，
+   体积反而更小（150KB vs 333KB），还少一个请求。
+   见 scripts/build-fonts.mjs —— 那边只收真正走衬线的字。 */
 @font-face {
   font-family: 'PaperSerif';
-  src: url('../fonts/paper-serif-regular.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'PaperSerif';
-  src: url('../fonts/paper-serif-bold.woff2') format('woff2');
-  font-weight: 700; font-style: normal; font-display: swap;
+  src: url('../fonts/paper-serif.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
 }
 
 /* 跳转链接：平时隐藏，Tab 聚焦时落到左上角 */

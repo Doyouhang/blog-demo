@@ -8,15 +8,12 @@
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { at } from '../scripts/site-base.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.SMOKE_PORT ?? 4321);
-// 站点可能挂在子路径下（GitHub Pages 项目页 SITE_BASE=/blog-demo/）。
-// 探测地址和传给 smoke 的地址都必须带上它 —— 去探 http://localhost:4321/
-// 在 base 不是 / 的时候恒返回 404，等于永远等不到「起来了」。
-// 本地不设 SITE_BASE、base 就是 /，所以这个坑本地必然测不出来，只在 CI 上炸。
-const BASE_PATH = (process.env.SITE_BASE ?? '/').replace(/\/+$/, '');
-const BASE = `http://localhost:${PORT}${BASE_PATH}`;
+// base 只有 scripts/site-base.mjs 一处说了算，那里写着这个坑的来龙去脉
+const BASE = at(`http://localhost:${PORT}`);
 
 // 两种语义要分开，混用会把「端口被别人占着」和「我们的站还没起来」搅在一起：
 //   listening —— 端口上有东西在应答就算，404 也算（判断端口是否被占）
