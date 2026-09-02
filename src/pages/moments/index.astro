@@ -5,6 +5,7 @@ import MomentCard from '../../components/MomentCard.astro';
 import Icon from '../../components/Icon.astro';
 import PhotoLab from '../../components/PhotoLab.astro';
 import { getCollection, render } from 'astro:content';
+import { cstYear, cstYearMonth } from '../../utils/cst';
 
 const B = import.meta.env.BASE_URL;
 
@@ -20,13 +21,13 @@ const rendered = await Promise.all(
 // 按年月分组，时间线才有节奏，不然一长条读不出跨度
 const groups = new Map<string, typeof rendered>();
 for (const r of rendered) {
-  const key = r.moment.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+  const key = cstYearMonth(r.moment.data.date);
   if (!groups.has(key)) groups.set(key, []);
   groups.get(key)!.push(r);
 }
 
 const photoCount = all.reduce((n, m) => n + m.data.photos.length, 0);
-const years = [...new Set(all.map((m) => m.data.date.getFullYear()))].sort((a, b) => b - a);
+const years = [...new Set(all.map((m) => cstYear(m.data.date)))].sort((a, b) => b - a);
 const places = [...new Set(all.map((m) => m.data.place).filter((p): p is string => !!p))];
 ---
 <BaseLayout title="此间" description="日常的图文记录：city walk、旅行、随手拍。" fullWidth>

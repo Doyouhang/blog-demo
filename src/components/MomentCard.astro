@@ -4,6 +4,7 @@
 // 固定网格在只有一张图时会把竖构图压得很难看。
 import { Image } from 'astro:assets';
 import type { CollectionEntry } from 'astro:content';
+import { cstMonthDay, cstTime } from '../utils/cst';
 
 interface Props {
   moment: CollectionEntry<'moments'>;
@@ -13,8 +14,8 @@ interface Props {
 const { moment } = Astro.props;
 const { date, place, photos } = moment.data;
 
-const day = date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
-const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+const day = cstMonthDay(date);
+const time = cstTime(date);
 const layout = photos.length === 1 ? 'one' : photos.length === 2 ? 'two' : 'grid';
 
 // EXIF 是可选的：手机拍的、别人给的图都不会有。有就显示，没有不留痕迹。
@@ -22,7 +23,7 @@ const shot = photos.find((p) => p.exif)?.exif;
 ---
 <article class="moment">
   <div class="moment-hd">
-    <time datetime={date.toISOString()}>{day} <span class="hm">{time}</span></time>
+    <time datetime={date.toISOString()}>{day}{time && <span class="hm"> {time}</span>}</time>
     {place && <span class="place">{place}</span>}
   </div>
 

@@ -44,6 +44,7 @@ const ogImage = OG_IMAGE && Astro.site ? new URL(`${B}${OG_IMAGE}`, Astro.site).
     <title>{pageTitle}</title>
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={`${B}favicon.svg`} />
+    <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={new URL(`${B}rss.xml`, Astro.site).href} />
     <link rel="sitemap" href={`${B}sitemap-index.xml`} />
 
     <!-- 社交分享预览 -->

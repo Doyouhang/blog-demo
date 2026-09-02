@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
 import { readingMinutes } from '../../utils/reading-time';
+import { cstISODate } from '../../utils/cst';
 
 export async function getStaticPaths() {
   const posts = await getCollection('essays', ({ data }) => !data.draft);
@@ -34,7 +35,7 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
     <a class="eyebrow" href={`${B}blog/`}>← 返回博客</a>
     <h1 transition:name={`post-${post.id}`}>{post.data.title}</h1>
     <p class="date">
-      {post.data.pubDate.toISOString().slice(0, 10)}
+      {cstISODate(post.data.pubDate)}
       <span aria-hidden="true"> · </span>
       约 {minutes} 分钟读完
     </p>

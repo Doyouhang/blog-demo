@@ -2,7 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import { getCollection, render } from 'astro:content';
-import { cstYear, cstYearMonth, cstMonthDay, cstTime } from '../../utils/cst';
+import { cstYear, cstYearMonth, cstMonthDay, cstTime, cstISODate } from '../../utils/cst';
 
 const B = import.meta.env.BASE_URL;
 
@@ -51,7 +51,7 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
           <section class="month">
             <h2 class="month-hd">{month}</h2>
             {list.map(({ spark, Content, long, peek }) => (
-              <article class="jot">
+              <article class="jot" id={cstISODate(spark.data.date)}>
                 <div class="when">
                   <span class="d">{cstMonthDay(spark.data.date)}</span>
                   {cstTime(spark.data.date) && <span class="t">{cstTime(spark.data.date)}</span>}

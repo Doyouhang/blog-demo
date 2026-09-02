@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="14" fill="#2f6df0"/>
-  <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle"
-        font-family="-apple-system, PingFang SC, Microsoft YaHei, sans-serif"
-        font-size="36" fill="#fff" font-weight="700">迩</text>
+  <rect width="64" height="64" rx="12" fill="#bf3b2b"/>
+  <rect x="5.5" y="5.5" width="53" height="53" rx="8" fill="none" stroke="#f7f4ec" stroke-opacity=".35" stroke-width="2"/>
+  <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle"
+    font-family="'Noto Serif SC','Source Han Serif SC','Noto Serif CJK SC','Songti SC',SimSun,serif"
+    font-size="34" fill="#f7f4ec" font-weight="700">迩</text>
 </svg>

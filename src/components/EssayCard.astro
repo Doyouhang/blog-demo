@@ -1,6 +1,7 @@
 ---
 // 文章条目。首页、博客列表、标签页共用同一种呈现，避免同一类内容三种样子。
 import type { CollectionEntry } from 'astro:content';
+import { cstISODate } from '../utils/cst';
 
 interface Props {
   post: CollectionEntry<'essays'>;
@@ -11,7 +12,7 @@ const { post, transitionName = true } = Astro.props;
 const B = import.meta.env.BASE_URL;
 ---
 <a class="post-card reveal" href={`${B}blog/${post.id}/`}>
-  <div class="post-date">{post.data.pubDate.toISOString().slice(0, 10)}</div>
+  <div class="post-date">{cstISODate(post.data.pubDate)}</div>
   {transitionName ? (
     <h3 transition:name={`post-${post.id}`}>{post.data.title}</h3>
   ) : (

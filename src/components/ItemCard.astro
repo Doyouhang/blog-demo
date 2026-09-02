@@ -4,6 +4,7 @@
 // 标题不在同一条竖线上会很难扫。留白但不画假的占位封面。
 import { Image } from 'astro:assets';
 import type { CollectionEntry } from 'astro:content';
+import { cstYearMonth } from '../utils/cst';
 
 interface Props {
   item: CollectionEntry<'items'>;
@@ -27,7 +28,7 @@ const text = String(blurb ?? '');
 const lines = text.split('\n');
 const isLong = text.length > 140 || lines.filter((l) => l.trim()).length > 4;
 const peek = lines.find((l) => l.trim()) ?? '';
-const when = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+const when = cstYearMonth(date);
 ---
 <article class:list={['item', !cover && 'item-bare']}>
   {cover && (

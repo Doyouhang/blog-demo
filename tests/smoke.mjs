@@ -30,7 +30,7 @@ let crashed = null;
 try {
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()} @${m.location()?.url ?? '?'}`); });
 
 await page.goto(BASE + '/', { waitUntil: 'networkidle' });
 ok('首页加载', await page.title() === '迩迩的小站', await page.title());
@@ -373,6 +373,14 @@ if (zhWord) {
 // 要测「无结果」分支得用真正不存在的字串。
 const rNone = await doSearch('zzzzqqqq');
 ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
+
+// RSS 与 robots.txt：发现性基础
+const feedRes = await page.goto(BASE + '/rss.xml');
+const feedTxt = feedRes.ok() ? await feedRes.text() : '';
+ok('RSS feed 可访问且格式正确', feedRes.ok() && feedTxt.includes('<rss') && feedTxt.includes('<item>'), `status ${feedRes.status()}`);
+const robotsRes = await page.goto(BASE + '/robots.txt');
+const robotsTxt = robotsRes.ok() ? await robotsRes.text() : '';
+ok('robots.txt 带 Sitemap', robotsRes.ok() && robotsTxt.includes('Sitemap:'), (robotsTxt.trim().split('\n').pop() ?? '').slice(0, 60));
 
 ok('运行期间无 JS 报错', errors.length === 0, errors.slice(0, 3).join(' | '));
 
