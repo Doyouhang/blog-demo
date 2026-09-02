@@ -40,6 +40,8 @@ const ogImage = OG_IMAGE && Astro.site ? new URL(`${B}${OG_IMAGE}`, Astro.site).
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a1c20" media="(prefers-color-scheme: dark)" />
     <meta name="generator" content={Astro.generator} />
     <title>{pageTitle}</title>
     <link rel="canonical" href={canonical} />
@@ -84,13 +86,14 @@ const ogImage = OG_IMAGE && Astro.site ? new URL(`${B}${OG_IMAGE}`, Astro.site).
     <ClientRouter />
   </head>
   <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
     <Header />
     {/* data-pagefind-body：只索引正文。不标的话导航和页脚会进每一页的索引，
         搜任何一个导航词都会命中全站，搜索结果就废了。 */}
     {/* 注意：不能写 data-pagefind-body={!noIndex} —— data-* 不是布尔属性，
         false 会被渲染成字符串 "false"，属性依然存在，Pagefind 只看存不存在，
         于是照样索引。必须给 undefined 才会整个属性都不输出。 */}
-    <main class:list={[!fullWidth && 'container']} data-pagefind-body={noIndex ? undefined : true}>
+    <main id="main" class:list={[!fullWidth && 'container']} data-pagefind-body={noIndex ? undefined : true}>
       <slot />
     </main>
     <Footer />

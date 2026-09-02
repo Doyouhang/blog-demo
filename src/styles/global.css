@@ -557,6 +557,41 @@ footer.site {
 }
 
 /* == paper-ink theme == */
+@font-face {
+  font-family: 'PaperSerif';
+  src: url('../fonts/paper-serif-regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'PaperSerif';
+  src: url('../fonts/paper-serif-bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+:root {
+  --font-display: 'PaperSerif', 'Noto Serif SC', 'Source Han Serif SC', 'Noto Serif CJK SC',
+    'Songti SC', 'STSong', 'SimSun', Georgia, 'Times New Roman', serif;
+}
+
+/* 跳转链接：平时隐藏，Tab 聚焦时落到左上角 */
+.skip-link {
+  position: fixed; left: 12px; top: -60px; z-index: 100;
+  background: var(--seal); color: var(--seal-fg);
+  padding: 9px 16px; border-radius: 6px; font-size: 14px;
+  transition: top var(--dur-fast) var(--ease);
+}
+.skip-link:focus { top: 12px; }
+
+/* 文章目录 */
+.toc {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+  padding: 14px 20px; margin: 20px 0 6px;
+}
+.toc h2 {
+  margin: 0 0 8px; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.14em; color: var(--muted); font-weight: 700;
+}
+.toc ol { margin: 0; padding-left: 20px; }
+.toc li { margin: 5px 0; font-size: 14px; }
 
 /* ============================================================
    纸墨档案主题覆盖（文艺方向）

@@ -31,13 +31,78 @@ const shot = photos.find((p) => p.exif)?.exif;
 
   {photos.length > 0 && (
     <div class:list={['shots', layout]}>
-      {photos.map((p) => (
+      {photos.map((p, i) => (
         <figure>
-          <Image src={p.src} alt={p.alt} widths={[400, 800, 1200]} sizes="(max-width: 720px) 100vw, 640px" />
+          <button class="shot-btn" data-lb-open={i} aria-label={`放大查看：${p.alt}`}>
+            <Image src={p.src} alt={p.alt} widths={[400, 800, 1200]} sizes="(max-width: 720px) 100vw, 640px" />
+          </button>
         </figure>
       ))}
     </div>
   )}
+
+  {photos.length > 0 && (
+    <dialog class="lb" aria-label="照片放大查看">
+      <div class="lb-stage">
+        {photos.map((p, i) => (
+          <figure class="lb-item" hidden={i !== 0}>
+            <Image src={p.src} alt={p.alt} widths={[1600]} sizes="92vw" />
+            <figcaption>
+              <span class="lb-alt">{p.alt}</span>
+              {p.exif && (
+                <span class="lb-exif">
+                  {[p.exif.camera, p.exif.lens, p.exif.focal, p.exif.aperture, p.exif.shutter, p.exif.iso && `ISO ${p.exif.iso}`]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              )}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+      <div class="lb-bar">
+        <button class="lb-prev" aria-label="上一张（←）">←</button>
+        <span class="lb-count">1 / {photos.length}</span>
+        <button class="lb-next" aria-label="下一张（→）">→</button>
+        <button class="lb-close" aria-label="关闭（Esc）">✕</button>
+      </div>
+    </dialog>
+  )}
+
+  <script>
+    import { onPageReady, markReady } from '../scripts/init';
+
+    // lightbox：点开放大，←/→ 切换，Esc / 点空白关闭（dialog 原生行为）
+    function initLightbox() {
+      document.querySelectorAll('article.moment').forEach((art) => {
+        const dlg = art.querySelector('dialog.lb') as HTMLDialogElement | null;
+        if (!dlg || !markReady(dlg)) return;
+        const items = [...dlg.querySelectorAll('.lb-item')] as HTMLElement[];
+        const count = dlg.querySelector('.lb-count');
+        let cur = 0;
+        const show = (i: number) => {
+          cur = (i + items.length) % items.length;
+          items.forEach((el, j) => (el.hidden = j !== cur));
+          if (count) count.textContent = `${cur + 1} / ${items.length}`;
+        };
+        art.querySelectorAll('[data-lb-open]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            show(Number((btn as HTMLElement).dataset.lbOpen));
+            dlg.showModal();
+          });
+        });
+        dlg.querySelector('.lb-prev')?.addEventListener('click', () => show(cur - 1));
+        dlg.querySelector('.lb-next')?.addEventListener('click', () => show(cur + 1));
+        dlg.querySelector('.lb-close')?.addEventListener('click', () => dlg.close());
+        dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+        dlg.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft') { e.preventDefault(); show(cur - 1); }
+          if (e.key === 'ArrowRight') { e.preventDefault(); show(cur + 1); }
+        });
+      });
+    }
+    onPageReady(initLightbox);
+  </script>
 
   {shot && (
     <p class="exif">
@@ -81,5 +146,40 @@ const shot = photos.find((p) => p.exif)?.exif;
 
   @media (max-width: 520px) {
     .shots.grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ----- lightbox ----- */
+  .shot-btn {
+    display: block; width: 100%; height: 100%; padding: 0; border: 0;
+    background: none; cursor: zoom-in; line-height: 0;
+  }
+  .shot-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  dialog.lb {
+    border: 0; padding: 12px; background: transparent;
+    max-width: min(1080px, 94vw); max-height: 94vh;
+  }
+  dialog.lb::backdrop { background: rgba(18, 16, 12, 0.9); }
+  .lb-item { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .lb-item[hidden] { display: none; }
+  .lb-item :global(img) {
+    max-height: 78vh; max-width: 100%; width: auto; height: auto;
+    margin: 0 auto; display: block; border-radius: 6px;
+  }
+  .lb-item figcaption {
+    color: #e6e2d8; font-size: 12px;
+    display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; text-align: center;
+  }
+  .lb-exif { font-family: var(--font-mono); color: #b9b4a8; }
+  .lb-bar { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 12px; }
+  .lb-bar button {
+    width: 38px; height: 38px; border-radius: 6px; cursor: pointer; font-size: 15px;
+    background: rgba(245, 243, 238, 0.12); color: #f5f3ee;
+    border: 1px solid rgba(245, 243, 238, 0.25);
+    transition: background var(--dur-fast) var(--ease);
+  }
+  .lb-bar button:hover { background: rgba(245, 243, 238, 0.24); }
+  .lb-count {
+    font-family: var(--font-mono); font-size: 13px; color: #e6e2d8;
+    min-width: 56px; text-align: center;
   }
 </style>
