@@ -1,5 +1,5 @@
 ---
-title: 《人类简史》读后
+title: 《人类简史》读后感
 description: 我们生活在由和我们非常不同的人在我们出生很久以前发明的思想牢狱之中。
 pubDate: "2023-12-23"
 topic: reading

@@ -121,7 +121,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
               <span>{item.text}</span>
             </div>
           ))}
-          {nowAt && <p class="side-foot">跟着收藏和照片自动更新 · {cstISODate(new Date(nowAt))}</p>}
+          {nowAt && <p class="side-foot"> · {cstISODate(new Date(nowAt))}</p>}
         </section>
 
         {movers.length > 0 && (
