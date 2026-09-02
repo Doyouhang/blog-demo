@@ -2,6 +2,8 @@
 title: 用 Astro + GitHub Pages 免费建站
 description: 从 Gitee 停运开始，到一个静态站真正跑起来。部署只花了一下午，剩下的时间都在填坑。
 pubDate: 2026-09-01
+topic: coding
+repo: https://github.com/Doyouhang/blog-demo
 tags: ['前端', 'Astro', '部署', '踩坑']
 ---
 

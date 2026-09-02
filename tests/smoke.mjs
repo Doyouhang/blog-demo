@@ -152,12 +152,24 @@ ok('钢琴键盘可操作（空格）', kbd);
 await page.click(`a[href="${at('/interests/')}"]`);
 await page.waitForSelector(`a[href="${at('/interests/coding/')}"]`);
 await page.click(`a[href="${at('/interests/coding/')}"]`);
+// 运行器收进页尾折叠之后，#run 默认不可见 —— 先展开再点
+await page.waitForSelector('details.lab summary');
+await page.click('details.lab summary');
 await page.waitForSelector('#run');
 await page.click('#run');
 await page.waitForFunction(() => (document.getElementById('output')?.textContent ?? '').includes('1 + 2 = 3'), null, { timeout: 5000 });
 ok('代码 demo 同步输出', true);
 await page.waitForFunction(() => (document.getElementById('output')?.textContent ?? '').includes('一秒后我也来了'), null, { timeout: 5000 });
 ok('代码 demo 异步输出不再丢失', true);
+
+// 代码模块现在装的是技术博客 + 对应仓库。仓库列表是从文章的 repo 字段反推的，
+// 不另外维护一份 —— 两处各写一份必然有一天不同步。这里验的就是「真的反推出来了」。
+const coding = await page.evaluate(() => ({
+  posts: document.querySelectorAll('.split-main .post-card, .split-main article').length,
+  repos: [...document.querySelectorAll('aside .side-row a[href^="http"]')].map((a) => a.getAttribute('href')),
+}));
+ok('代码页列出了技术文章', coding.posts > 0, `${coding.posts} 篇`);
+ok('仓库从文章里反推出来', coding.repos.length > 0, coding.repos.join(' ') || '（一个都没有）');
 
 // 6. 死循环被超时掐掉，页面没被卡死
 await page.fill('#code', 'while (true) {}');

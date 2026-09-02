@@ -97,6 +97,9 @@ export const TYPES = {
         options: [{ v: 'blog', t: '博客' }, { v: 'music', t: '音乐' }, { v: 'reading', t: '读书' },
                   { v: 'watching', t: '影视' }, { v: 'food', t: '美食' }, { v: 'coding', t: '代码' }] },
       { key: 'tags', label: '标签', type: 'tags' },
+      // 仓库链接只有技术文章用得上，别的归属下露出来是噪音
+      { key: 'repo', label: '代码仓库（完整地址）', type: 'text', onlyWhen: { topic: 'coding' },
+        placeholder: 'https://github.com/你的用户名/仓库名' },
     ],
   },
 };

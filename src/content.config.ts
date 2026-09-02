@@ -15,6 +15,9 @@ const essays = defineCollection({
     pubDate: z.coerce.date(),
     topic: z.enum(['blog', 'music', 'reading', 'watching', 'food', 'coding']).default('blog'),
     tags: z.array(z.string()).default([]),
+    // 技术文章对应的代码仓库。用完整 URL 而不是 owner/repo 简写：
+    // 不是所有东西都在 GitHub 上，而且 url() 能在构建期挡住拼错的地址。
+    repo: z.string().url().optional(),
     draft: z.boolean().default(false),
   }),
 });
