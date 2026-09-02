@@ -6,17 +6,24 @@
 <link rel="icon" href="data:," />
   <title>Studio · 迩迩的小站</title>
 <style>
+  /* 纸墨主题：令牌与 src/styles/global.css 对齐，一个站一套视觉 */
   :root {
-    --bg: #fdfdfd; --panel: #fff; --fg: #1f2328; --muted: #65707a;
-    --border: #e6e8eb; --accent: #2f6df0; --accent-weak: #eef3ff;
-    --ok: #16a34a; --danger: #dc2626; --warn-bg: #fff7ed; --warn-fg: #9a3412; --warn-border: #fed7aa;
-    --radius: 10px;
+    color-scheme: light;
+    --bg: #f5f3ee; --panel: #fbfaf6; --fg: #23262b; --muted: #6f6b60;
+    --border: #ddd7c8; --accent: #2f4d7e; --accent-fg: #f5f3ee; --accent-weak: #e9edf4;
+    --ok: #3e7a5e; --danger: #bf3b2b; --warn-bg: #f6efe1; --warn-fg: #8a5a1d; --warn-border: #e3cfa7;
+    --seal: #bf3b2b; --seal-fg: #f7f4ec;
+    --radius: 6px;
+    --font-display: "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", SimSun, Georgia, serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1216; --panel: #161a20; --fg: #e4e8ee; --muted: #98a3b0; --danger: #f87171;
-      --border: #262c34; --accent: #6ea8ff; --accent-weak: #17243a;
-      --warn-bg: #2a1d10; --warn-fg: #fdba74; --warn-border: #7c4a1a;
+      color-scheme: dark;
+      --bg: #1a1c20; --panel: #20232a; --fg: #e6e2d8; --muted: #9b968a; --danger: #e0705c;
+      --border: #383b40; --accent: #a9bedf; --accent-fg: #1a1c20; --accent-weak: rgba(169, 190, 223, 0.14);
+      --warn-bg: rgba(224, 166, 66, 0.12); --warn-fg: #e4b568; --warn-border: rgba(224, 166, 66, 0.34);
+      --ok: #6fbf97; --seal: #cf5741;
     }
   }
   * { box-sizing: border-box; }
@@ -27,18 +34,33 @@
   }
   /* 侧栏 */
   .side { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
-  .brand { padding: 16px; border-bottom: 1px solid var(--border); font-weight: 600; }
-  .brand small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 2px; }
+  .brand {
+    padding: 16px; border-bottom: 1px solid var(--border); font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-display); font-size: 17px; letter-spacing: 0.03em;
+  }
+  .brand small {
+    display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 2px;
+    font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; letter-spacing: 0;
+  }
+  .seal {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 5px;
+    background: var(--seal); color: var(--seal-fg);
+    font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1;
+    transform: rotate(-3deg);
+    box-shadow: inset 0 0 0 1.5px rgba(247, 244, 236, 0.28);
+  }
   .types { padding: 10px; display: flex; gap: 6px; }
   .types button {
     flex: 1; padding: 7px 0; border: 1px solid var(--border); background: var(--panel);
-    color: var(--fg); border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px;
+    color: var(--fg); border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px;
   }
-  .types button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .types button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
   .list { flex: 1; overflow: auto; padding: 0 10px 10px; min-height: 0; }
   .list button {
     display: block; width: 100%; text-align: left; padding: 9px 10px; margin-bottom: 4px;
-    border: 1px solid transparent; background: none; color: var(--fg); border-radius: 8px;
+    border: 1px solid transparent; background: none; color: var(--fg); border-radius: 6px;
     cursor: pointer; font: inherit; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .list button:hover { background: var(--accent-weak); }
@@ -58,17 +80,17 @@
   label.f { display: block; margin-bottom: 16px; }
   label.f > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
   input[type=text], input[type=date], input[type=datetime-local], select, textarea {
-    width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--panel); color: var(--fg); font: inherit;
   }
   textarea { resize: vertical; line-height: 1.75; }
   button.act {
-    padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+    padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; font-size: 14px;
   }
-  button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
   button.act:disabled { opacity: .5; cursor: not-allowed; }
-  .req { color: #dc2626; }
+  .req { color: var(--danger); }
 
   /* 评分 */
   .rate-set { border: none; margin: 0 0 16px; padding: 0; }
@@ -88,7 +110,7 @@
   }
   .drop.over { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); }
   .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
-  .shot { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .shot { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--panel); }
   .shot img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
   .shot .cap { padding: 6px 8px; font-size: 11px; color: var(--muted); }
   .shot input { width: 100%; border: none; border-top: 1px solid var(--border); padding: 5px 8px;
@@ -96,7 +118,7 @@
   .shot .del { width: 100%; border: none; border-top: 1px solid var(--border); padding: 4px;
                background: none; color: var(--muted); cursor: pointer; font-size: 11px; }
   .cover-box { display: flex; gap: 12px; align-items: flex-start; }
-  .cover-box img { width: 90px; border-radius: 8px; border: 1px solid var(--border); display: block; }
+  .cover-box img { width: 90px; border-radius: 6px; border: 1px solid var(--border); display: block; }
   .list-group {
     display: flex; justify-content: space-between; align-items: baseline;
     padding: 14px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted);
@@ -107,7 +129,7 @@
     padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; font-size: 12px;
   }
-  button.mini.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.mini.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
   button.mini:hover { filter: brightness(1.08); }
   .cover-hits {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -115,7 +137,7 @@
   }
   .cover-hit {
     display: flex; flex-direction: column; gap: 4px; padding: 6px; text-align: left;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
     color: inherit; font: inherit;
   }
   .cover-hit:hover, .cover-hit:focus-visible { border-color: var(--accent); }
@@ -128,11 +150,11 @@
   .cover-hit i { font-size: 10px; color: var(--muted); font-style: normal; }
   .cover-hits .tip { grid-column: 1 / -1; margin: 0; }
 
-  .tip { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
+  .tip { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px;
          background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
   .log { padding: 10px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted);
          white-space: pre-wrap; max-height: 140px; overflow: auto; }
-  .log b { color: var(--fg); }
+  .log b { color: var(--fg); font-family: var(--font-mono); }
   .log .ok { color: var(--ok); }
   .log .err { color: var(--danger); }
   /* 危险操作和保存离远一点，也不做成实心按钮 —— 别让它长得像个该点的东西 */
@@ -141,17 +163,20 @@
     margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border);
   }
   .danger button {
-    padding: 6px 14px; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer;
+    padding: 6px 14px; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer;
     background: none; border: 1px solid var(--danger); color: var(--danger);
   }
-  .danger button:hover { background: var(--danger); color: #fff; }
+  .danger button:hover { background: var(--danger); color: var(--seal-fg); }
   .danger span { color: var(--muted); font-size: 12px; }
   .empty { color: var(--muted); padding: 40px 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ::selection { background: rgba(191, 59, 43, 0.16); }
+  @media (prefers-color-scheme: dark) { ::selection { background: rgba(207, 87, 65, 0.32); } }
 </style>
 </head>
 <body>
   <aside class="side">
-    <div class="brand">Studio<small>迩迩的小站</small></div>
+    <div class="brand"><span class="seal" aria-hidden="true">迩</span><span>Studio<small>迩迩的小站</small></span></div>
     <div class="types" id="types"></div>
     <div class="list" id="list"></div>
   </aside>
