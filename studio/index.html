@@ -172,6 +172,18 @@
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   ::selection { background: rgba(191, 59, 43, 0.16); }
   @media (prefers-color-scheme: dark) { ::selection { background: rgba(207, 87, 65, 0.32); } }
+
+  /* 页内确认框：关键操作不依赖原生 prompt/confirm ——
+     原生框被浏览器静默屏蔽时（"不再显示"被勾上）会整个流程无声死掉 */
+  dialog.dlg {
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--panel); color: var(--fg);
+    padding: 20px 22px; width: min(480px, 92vw);
+  }
+  dialog.dlg::backdrop { background: rgba(18, 16, 12, 0.5); }
+  dialog.dlg h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 18px; }
+  .dlg-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .dlg-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 </style>
 </head>
 <body>
@@ -192,6 +204,25 @@
     <div class="form" id="form"><p class="empty">左边选一条，或者新建。</p></div>
     <div class="log" id="log"></div>
   </div>
+
+  <dialog id="dlg-commit" class="dlg" aria-label="提交改动">
+    <h2>提交改动</h2>
+    <p class="dlg-note" id="commit-note"></p>
+    <input type="text" id="commit-msg" autocomplete="off" />
+    <div class="dlg-bar">
+      <button class="act" id="commit-cancel">取消</button>
+      <button class="act primary" id="commit-ok">提交</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-push" class="dlg" aria-label="发布上线">
+    <h2>发布上线</h2>
+    <p class="dlg-note">推送到 main 会触发 Actions 自动部署，内容会真的上线。确定吗？</p>
+    <div class="dlg-bar">
+      <button class="act" id="push-cancel">取消</button>
+      <button class="act primary" id="push-ok">推送</button>
+    </div>
+  </dialog>
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
@@ -709,15 +740,29 @@ $('#btn-check').onclick = async () => {
     log(r.ok ? '校验通过' : '校验没过：\n' + r.out, r.ok ? 'ok' : 'err');
   } catch (e) { log(e.message, 'err'); }
 };
-$('#btn-commit').onclick = async () => {
-  const msg = prompt('提交信息', `content: 更新${S.types[cur.type].label}`);
-  if (!msg) return;
-  try { await api('/api/commit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg }) });
+// 提交/发布走页内 dialog。原生 prompt/confirm 被浏览器屏蔽时是无声死掉，
+// 页内框至少看得见、点得着，取消也是明确动作。
+$('#btn-commit').onclick = () => {
+  $('#commit-note').textContent = `${S.git.files.length} 个文件有改动，只会提交 src/content 下的内容。`;
+  $('#commit-msg').value = `content: 更新${S.types[cur.type].label}`;
+  $('#dlg-commit').showModal();
+  $('#commit-msg').focus();
+};
+$('#commit-cancel').onclick = () => $('#dlg-commit').close();
+$('#commit-ok').onclick = async () => {
+  const msg = $('#commit-msg').value.trim();
+  if (!msg) { $('#commit-msg').focus(); return; }
+  $('#dlg-commit').close();
+  try {
+    await api('/api/commit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: msg }) });
     log('已提交', 'ok'); await refresh();
   } catch (e) { log(e.message, 'err'); }
 };
-$('#btn-push').onclick = async () => {
-  if (!confirm('推送到 main 会触发 Actions 自动部署，内容会真的上线。确定吗？')) return;
+$('#commit-msg').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#commit-ok').click(); });
+$('#btn-push').onclick = () => $('#dlg-push').showModal();
+$('#push-cancel').onclick = () => $('#dlg-push').close();
+$('#push-ok').onclick = async () => {
+  $('#dlg-push').close();
   try {
     // 先跑一遍类型/schema 校验再推。推上去才发现构建挂了，站点就停在旧版本，
     // 而你以为已经发出去了。宁可在这里多等十几秒。
@@ -729,6 +774,10 @@ $('#btn-push').onclick = async () => {
     await refresh();
   } catch (e) { log(e.message, 'err'); }
 };
+for (const id of ['dlg-commit', 'dlg-push']) {
+  const d = document.getElementById(id);
+  d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
+}
 
 refresh().then(() => { newEntry(); log('就绪'); }).catch((e) => log(e.message, 'err'));
 </script>
