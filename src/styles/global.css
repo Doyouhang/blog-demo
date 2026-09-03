@@ -154,7 +154,7 @@ header.site {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 .brand { font-weight: 700; font-size: 18px; color: var(--fg); white-space: nowrap; }
-.brand:hover { text-decoration: none; color: var(--accent); }
+.brand:hover { text-decoration: none; color: var(--hover-ink); }
 .nav-right { display: flex; align-items: center; gap: 14px; }
 .nav-links { display: flex; gap: 18px; }
 .nav-links a {
@@ -167,7 +167,7 @@ header.site {
   transform: scaleX(0); transform-origin: center;
   transition: transform var(--dur) var(--ease-spring);
 }
-.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.nav-links a:hover { color: var(--hover-ink); text-decoration: none; }
 .nav-links a:hover::after,
 .nav-links a[aria-current='page']::after { transform: scaleX(1); }
 .nav-links a[aria-current='page'] { color: var(--fg); font-weight: 600; }
@@ -180,7 +180,7 @@ header.site {
   transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
     transform var(--dur) var(--ease-spring);
 }
-.theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.theme-toggle:hover { color: var(--hover-ink); border-color: var(--hover-ink); }
 .theme-toggle:active { transform: scale(0.92); }
 .theme-toggle .icon-light, .theme-toggle .icon-dark { display: flex; line-height: 0; }
 .theme-toggle .icon-dark { display: none; }
@@ -196,7 +196,7 @@ main { padding: 40px 0 60px; }
 .sec-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .sec-hd h2 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
 .sec-hd a, .sec-note { font-size: 14px; color: var(--muted); }
-.sec-hd a:hover { color: var(--accent); text-decoration: none; }
+.sec-hd a:hover { color: var(--hover-ink); text-decoration: none; }
 
 .intro {
   display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
@@ -217,7 +217,7 @@ main { padding: 40px 0 60px; }
   border-radius: 10px; padding: 9px 15px; font-size: 14px; font-weight: 600;
   transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
-.intro-links a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.intro-links a:hover { border-color: var(--hover-ink); color: var(--hover-ink); text-decoration: none; }
 
 /* 统一页头：博客 / 兴趣 / 标签 / 关于 / 404 共用 */
 .page-head { padding: 48px 0 8px; }
@@ -227,7 +227,7 @@ main { padding: 40px 0 60px; }
 }
 /* 「← 返回博客」这类是可点的，净高 21px 不够 24 */
 a.eyebrow { padding: 3px 0; margin-bottom: 7px; }
-a.eyebrow:hover { color: var(--accent); text-decoration: none; }
+a.eyebrow:hover { color: var(--hover-ink); text-decoration: none; }
 .page-head h1 { font-size: 34px; margin: 0; letter-spacing: -0.02em; line-height: 1.25; }
 .page-head .lead { margin: 12px 0 0; color: var(--muted); max-width: 46em; }
 .head-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
@@ -239,7 +239,7 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
 }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .btn-primary:hover { filter: brightness(1.08); text-decoration: none; }
-.btn-quiet:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.btn-quiet:hover { border-color: var(--hover-ink); color: var(--hover-ink); text-decoration: none; }
 
 /* 不对称双栏骨架：首页、博客、标签、关于共用。空洞感主要靠这个结构解决 */
 .split {
@@ -251,7 +251,6 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
 }
 .post-card:first-of-type { padding-top: 0; }
 .post-card:hover { text-decoration: none; }
-.post-card:hover h3 { color: var(--accent); }
 .post-date { font-size: 12.5px; color: var(--muted); }
 .post-card h3 {
   font-size: 20px; margin: 8px 0 6px; letter-spacing: -0.01em;
@@ -296,10 +295,7 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
   transition: transform var(--dur) var(--ease-spring), border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease);
 }
-.interest-card:hover {
-  transform: translateY(-4px); border-color: var(--accent);
-  box-shadow: var(--shadow-card); text-decoration: none;
-}
+.interest-card:hover { text-decoration: none; }
 .interest-icon {
   display: flex; align-items: center; justify-content: center;
   width: 48px; height: 48px; border-radius: 13px;
@@ -312,7 +308,7 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
   margin-top: 16px; color: var(--accent); font-size: 13px; font-weight: 600;
   transition: transform var(--dur) var(--ease-spring);
 }
-.interest-card:hover .interest-cta { transform: translateX(4px); display: inline-block; }
+.interest-card:hover .interest-cta { transform: translateX(4px); display: inline-block; color: var(--hover-ink); }
 
 /* 侧栏标签云 */
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -322,7 +318,7 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
   padding: 5px 12px; font-size: 13px; color: var(--fg); background: var(--surface);
   transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
-.tag-chip:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.tag-chip:hover { border-color: var(--hover-ink); color: var(--hover-ink); text-decoration: none; }
 .tag-chip .n { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .tag-chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .tag-chip.on .n { color: var(--accent-fg); opacity: .75; }
@@ -338,7 +334,7 @@ a.eyebrow:hover { color: var(--accent); text-decoration: none; }
   background: var(--card); border: 1px solid var(--border);
   transition: transform var(--dur) var(--ease-spring), border-color var(--dur) var(--ease);
 }
-.int-cell:hover { transform: translateY(-3px); border-color: var(--accent); text-decoration: none; }
+.int-cell:hover { text-decoration: none; }
 .int-icon { color: var(--accent); line-height: 0; }
 .int-cell b { font-size: 14px; font-weight: 600; }
 
@@ -510,7 +506,7 @@ footer.site {
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease), transform var(--dur) var(--ease-spring);
 }
-.chip:hover { border-color: var(--accent); }
+.chip:hover { border-color: var(--hover-ink); }
 .chip:active { transform: scale(0.95); }
 .chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .demo-result {
@@ -606,6 +602,47 @@ footer.site {
   color: var(--muted); font-size: 12.5px; text-align: center; line-height: 2.1;
 }
 .colophon b { color: var(--fg); font-weight: 600; }
+/* ===== 全站悬停签名：滑块高亮 + 朱红 =====
+   从闪念页 .jot 抽象：悬停时伪元素铺一层柔和高光块，次级文字转朱红。
+   触摸设备无 hover 不触发；reduced-motion 全局关过渡。
+   正文内联链接保留藏青下划线，与签名是两套系统。 */
+:root { --hover-bg: var(--bg-soft); --hover-ink: var(--seal); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --hover-bg: var(--surface); }
+}
+:root[data-theme='dark'] { --hover-bg: var(--surface); }
+
+/* 博客卡 */
+.post-card { position: relative; z-index: 0; }
+.post-card::after {
+  content: ''; position: absolute; inset: 10px -12px; z-index: -1;
+  border-radius: 8px; background: transparent; pointer-events: none;
+  transition: background var(--dur) var(--ease);
+}
+.post-card:hover::after { background: var(--hover-bg); }
+.post-card .post-date { transition: color var(--dur-fast) var(--ease); }
+.post-card:hover .post-date { color: var(--hover-ink); }
+
+/* 兴趣卡：高光垫在卡底之上、文字之下 */
+.interest-card { position: relative; z-index: 0; }
+.interest-card::before {
+  content: ''; position: absolute; inset: 6px; z-index: -1;
+  border-radius: 8px; background: transparent; pointer-events: none;
+  transition: background var(--dur) var(--ease);
+}
+.interest-card:hover::before { background: var(--hover-bg); }
+
+/* 首页兴趣格 */
+.int-cell { position: relative; z-index: 0; }
+.int-cell::before {
+  content: ''; position: absolute; inset: 4px; z-index: -1;
+  border-radius: 8px; background: transparent; pointer-events: none;
+  transition: background var(--dur) var(--ease);
+}
+.int-cell:hover::before { background: var(--hover-bg); }
+.int-cell b { transition: color var(--dur-fast) var(--ease); }
+.int-cell:hover b { color: var(--hover-ink); }
+
 .colophon-word {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700;
   letter-spacing: 0.18em; text-transform: uppercase; margin-right: 8px;
@@ -789,7 +826,7 @@ a:hover > .seal, .seal:hover { transform: rotate(0deg) scale(1.05); }
   background: transparent; border: 1px solid var(--accent-line);
   border-radius: 4px; letter-spacing: 0.08em;
 }
-a.tag:hover { background: var(--accent-weak); border-color: var(--accent); }
+a.tag:hover { background: var(--accent-weak); border-color: var(--hover-ink); color: var(--hover-ink); }
 .tag-chip { border-radius: 4px; background: transparent; }
 .chip { border-radius: 4px; }
 

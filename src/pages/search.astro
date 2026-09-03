@@ -54,7 +54,16 @@ import Icon from '../components/Icon.astro';
       display: block; padding: 16px 0; border-bottom: 1px solid var(--border);
       color: inherit; text-decoration: none;
     }
-    .hit:hover h3 { color: var(--accent); }
+    /* 悬停签名：滑块高亮 + 路径转朱红 */
+    .hit { position: relative; z-index: 0; }
+    .hit::after {
+      content: ''; position: absolute; inset: 8px -12px; z-index: -1;
+      border-radius: 8px; background: transparent; pointer-events: none;
+      transition: background var(--dur) var(--ease);
+    }
+    .hit:hover::after { background: var(--hover-bg); }
+    .hit .url { transition: color var(--dur-fast) var(--ease); }
+    .hit:hover .url { color: var(--hover-ink); }
     .hit h3 { margin: 0 0 4px; font-size: 16px; }
     .hit .url { color: var(--muted); font-size: 12px; margin: 0 0 6px; }
     .hit .ex { margin: 0; font-size: 14px; line-height: 1.75; color: var(--muted); }

@@ -213,7 +213,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
     overflow: hidden; background: var(--card); color: inherit;
     transition: border-color var(--dur-fast) var(--ease);
   }
-  .side-shot:hover { border-color: var(--accent); text-decoration: none; }
+  .side-shot:hover { border-color: var(--hover-ink); text-decoration: none; }
   .side-shot :global(img) {
     display: block; width: 100%; flex: 1 1 auto; min-height: 0; object-fit: cover;
   }
@@ -223,7 +223,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
     border-top: 1px solid var(--border);
   }
   .side-shot-cap .where { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .side-shot:hover .side-shot-cap { color: var(--accent); }
+  .side-shot:hover .side-shot-cap { color: var(--hover-ink); }
 
   /* 封面高矮胖瘦各不相同，装进一个等高的框里，六个格子才齐 */
   .int-shelf {
