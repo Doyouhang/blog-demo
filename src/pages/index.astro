@@ -94,7 +94,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
 <BaseLayout fullWidth noIndex>
   <div class="container-wide">
     <section class="intro">
-      <div class="avatar" aria-hidden="true">迩</div>
+      <div class="avatar" id="intro-seal" aria-hidden="true">迩</div>
       <div class="intro-text">
         <h1>你好，我是{AUTHOR}</h1>
         <p>白天当牛马，晚上折腾些没用但有趣的东西。</p>
@@ -125,7 +125,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
         </section>
 
         {movers.length > 0 && (
-          <section class="side-box reveal">
+          <section class="side-box dossier reveal">
             <h2>自选股 · 收盘</h2>
             {movers.map((r) => (
               <div class="side-row">
@@ -183,11 +183,10 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
                 )}
               </span>
               <span class="int-name"><Icon name={i.icon} size={15} /><b>{i.title}</b></span>
-              <span class="int-sub">
-                {latest
-                  ? (latest.data.kind === 'song' ? latest.data.title : `《${latest.data.title}》`)
-                  : i.tags[0]}
-              </span>
+              {/* 副标题统一用分区描述（tags 前两个），不再混排「最近一条」：
+                  之前有封面的显示书名、没封面的退回 tags[0]，同一行两种含义。
+                  「最近」这件事交给上面的封面图和「最近更新」流去讲 */}
+              <span class="int-sub">{i.tags.slice(0, 2).join(' · ')}</span>
             </a>
           );
         })}
@@ -234,11 +233,13 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
     max-height: 84px; max-width: 100%; width: auto; height: auto;
     border-radius: 4px; object-fit: contain;
   }
-  .int-big { color: var(--accent); line-height: 0; }
+  /* 朱红和 .int-name 的小图标、兴趣页的 .interest-icon / .demo-head-icon 一致；
+     .int-big 还是 .demo-head-icon 的 view-transition 配对，两处颜色必须相同 */
+  .int-big { color: var(--seal); line-height: 0; }
   /* grid item 默认 min-width:auto。格子里那行书名是 nowrap 的，
      长一点就会把列撑宽、挤到别的格子 —— 这里让它老实收缩，交给省略号 */
   .int-cell { min-width: 0; }
-  .int-name { display: flex; align-items: center; gap: 6px; color: var(--accent); line-height: 0; }
+  .int-name { display: flex; align-items: center; gap: 6px; color: var(--seal); line-height: 0; }
   .int-name b { font-size: 14px; font-weight: 600; color: var(--fg); line-height: 1.4; }
   .int-sub {
     font-size: 12px; color: var(--muted); text-align: center; max-width: 100%;
@@ -258,3 +259,24 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
     .int-row { grid-template-columns: repeat(3, 1fr); }
   }
 </style>
+
+<script>
+  import { onPageReady, markReady } from '../scripts/init';
+
+  // 入场「盖章」：每次会话只在第一次进首页时放一次。
+  // sessionStorage 换标签页 / 关掉再开会重放一次，同会话内反复导航不打扰。
+  // 动画本体在 global.css 的 .avatar.stamp（keyframes stamp-in）。
+  function initStamp() {
+    const seal = document.getElementById('intro-seal');
+    if (!seal || !markReady(seal)) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    try {
+      if (sessionStorage.getItem('stamped')) return;
+      sessionStorage.setItem('stamped', '1');
+    } catch {
+      /* 隐私模式存不了就当作第一次，多放一次无妨 */
+    }
+    seal.classList.add('stamp');
+  }
+  onPageReady(initStamp);
+</script>

@@ -1,0 +1,158 @@
+---
+// 设计语言页：把「纸墨档案」从一套隐性约定摊开成一张显性清单。
+// 令牌值直接写在这里（而不是 CSS 变量渲染），因为这一页要同时展示
+// 亮 / 暗两套的对照 —— 变量在任一时刻只有一份数值。
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Icon from '../components/Icon.astro';
+import { cstISODate } from '../utils/cst';
+
+const B = import.meta.env.BASE_URL;
+
+type Swatch = { name: string; light: string; dark: string; note: string };
+const COLORS: Swatch[] = [
+  { name: '纸', light: '#f5f3ee', dark: '#1b1815', note: '页面底色。暗色是暖墨黑，不是中性黑' },
+  { name: '墨', light: '#23262b', dark: '#ece5d4', note: '正文。亮色冷墨、暗色暖米，互为镜像' },
+  { name: '藏青', light: '#2f4d7e', dark: '#a9bedf', note: '链接与交互色，一套冷调压住暖纸' },
+  { name: '朱红', light: '#bf3b2b', dark: '#cf5741', note: '印章与签名色。只做极小点缀，永不铺大面积' },
+  { name: '笺', light: '#fbfaf6', dark: '#221f1b', note: '卡片。比底色亮/深一阶，靠边框不靠阴影分层' },
+];
+
+const MOTION = [
+  { name: '--dur-fast', value: '120ms', note: '颜色 / 边框过渡' },
+  { name: '--dur', value: '220ms', note: '背景 / 常规过渡' },
+  { name: '--dur-slow', value: '420ms', note: '进场揭示 / 弹性动效' },
+];
+
+const PIPELINE = [
+  { icon: 'code' as const, title: 'Astro 静态生成', text: '无后端、无追踪脚本，托管在 GitHub Pages。' },
+  { icon: 'book' as const, title: 'PaperSerif 子集自托管', text: 'Noto Serif SC 可变字重（400–700）子集，一个 woff2 顶两个静态子集，见 scripts/build-fonts.mjs。' },
+  { icon: 'chart' as const, title: '行情流水线', text: '自选股收盘数据由构建定时任务拉取 eastmoney 接口刷新。' },
+];
+---
+<BaseLayout title="设计" description="这个站的设计语言：纸墨档案 —— 令牌、字体、动效与构建流水线" fullWidth noIndex>
+  <div class="container-wide">
+    <PageHeader
+      eyebrow="纸墨档案"
+      title="设计语言"
+      lead="一套令牌、三种字型、一枚印章。这一页把它们全部摊开 —— 改任何视觉决策，先在这里对齐。"
+    />
+
+    <div class="split">
+      <div class="split-main prose">
+
+        <h2>色彩令牌</h2>
+        <p>
+          全站只有五个核心色，其余（边框、底衬、行情红绿）都是这五个的衍生。
+          亮色是「日光下的墨案」，暗色是「油灯下的夜读」—— 不是简单的颜色翻转，
+          中性色在暗色下整体转暖。
+        </p>
+        <div class="tok-grid">
+          {COLORS.map((c) => (
+            <div class="tok">
+              <div class="tok-pair">
+                <span class="tok-chip" style={`--c:${c.light}`} title={`亮 ${c.light}`}></span>
+                <span class="tok-chip" style={`--c:${c.dark}`} title={`暗 ${c.dark}`}></span>
+              </div>
+              <b>{c.name}</b>
+              <code>{c.light} / {c.dark}</code>
+              <span class="tok-note">{c.note}</span>
+            </div>
+          ))}
+        </div>
+
+        <h2>字型三层</h2>
+        <p>标题衬线、正文无衬线、数据等宽，各管一摊：</p>
+        <ul>
+          <li><b>PaperSerif</b>（衬线）— h1–h3、品牌名、引文、印章字。中文标题的「书卷气」全靠它。</li>
+          <li><b>系统无衬线</b> — 正文与界面文字。不加载额外字体，交给每个系统最好的那个。</li>
+          <li><b>等宽</b> — 日期、涨跌幅、戳记标签。数字用 <code>tabular-nums</code> 对齐小数点。</li>
+        </ul>
+
+        <h2>动效</h2>
+        <p>
+          三个时长令牌 + 一条弹性曲线（<code>linear()</code>，老浏览器回退 cubic-bezier）。
+          悬停签名是全站统一的：伪元素铺一层柔和高光，次级文字转朱红 ——
+          触摸设备不触发，<code>prefers-reduced-motion</code> 下全部关闭。
+        </p>
+        <div class="tok-grid mot">
+          {MOTION.map((m) => (
+            <div class="tok">
+              <code>{m.name}</code>
+              <b>{m.value}</b>
+              <span class="tok-note">{m.note}</span>
+            </div>
+          ))}
+        </div>
+
+        <h2>组件形态</h2>
+        <ul>
+          <li><b>印章</b> — 品牌签名。rotate(-3deg)、内嵌 1.5px 白描边，悬停转正。入场时从空中「盖」下来一次。</li>
+          <li><b>卡片盒</b> — 边框 + 底色，给「笔记」类内容（此刻、关于侧栏）。</li>
+          <li><b>卷宗条</b> — 左侧 3px 朱红装订线，无底色无边框，给「定期出的报告」（自选股 · 收盘）。</li>
+          <li><b>圆角</b> — 两档：6px（按钮、输入框）/ 8px（卡片、盒子），全站无第三档。</li>
+        </ul>
+
+        <h2>规矩</h2>
+        <ul>
+          <li>A 股红涨绿跌，平盘走灰；暗色下涨跌色各调亮一档保对比度。</li>
+          <li>朱红只做小面积点缀（印章、下划线、装订线、选中色），永不作为大面积主色。</li>
+          <li>所有交互元素点击净高 ≥ 24px；Tab 焦点环永远可见。</li>
+          <li>改令牌只动 <code>global.css</code> 顶部那一段；改完跑像素基线回归（playwright-core 全页截图 + 逐字节比对）。</li>
+        </ul>
+      </div>
+
+      <aside>
+        <section class="side-box">
+          <h2>构建流水线</h2>
+          {PIPELINE.map((p) => (
+            <div class="side-row">
+              <Icon name={p.icon} size={18} />
+              <span>{p.title}</span>
+            </div>
+          ))}
+          <p class="side-foot">静态生成，无后端、无追踪脚本。</p>
+        </section>
+        <section class="side-box">
+          <h2>设计决策存档</h2>
+          <div class="side-row"><span>主题</span><span class="side-val">跟随系统，可切换</span></div>
+          <div class="side-row"><span>视转</span><span class="side-val">兴趣图标三处配对</span></div>
+          <div class="side-row"><span>打印</span><span class="side-val">文章印成一张纸</span></div>
+          <p class="side-foot">令牌的完整定义在 <code>src/styles/global.css</code> 顶部。</p>
+        </section>
+      </aside>
+    </div>
+
+    <p class="colophon">
+      <span class="colophon-word">Colophon</span>
+      本页最后核对 · {cstISODate(new Date())} · 亮暗两套令牌逐条对齐
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .tok-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px; margin: 18px 0 26px;
+  }
+  .tok {
+    display: flex; flex-direction: column; gap: 4px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); padding: 14px 16px; font-size: 13px;
+  }
+  .tok-pair { display: flex; gap: 6px; margin-bottom: 6px; }
+  .tok-chip {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: var(--c); border: 1px solid var(--border);
+  }
+  .tok b { font-size: 14px; }
+  .tok code {
+    font-size: 11.5px; color: var(--muted); background: var(--code-bg);
+    padding: 1px 6px; border-radius: 4px; width: fit-content;
+  }
+  .tok-note { color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .tok.mot .tok-chip { display: none; }
+  @media (max-width: 720px) {
+    .tok-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
