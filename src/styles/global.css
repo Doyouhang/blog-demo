@@ -361,8 +361,10 @@ article h1 { font-size: 30px; margin-bottom: 6px; line-height: 1.35; }
    一整段，1984 的「战争即和平／自由即奴役／无知即力量」会挤成一行。
    闪念页用的就是这一招（src/pages/sparks/index.astro），保持一致，也不引新依赖；
    换 remark-breaks 反而会和闪念页的 pre-wrap 叠成双倍换行。
-   前提是正文里没有 1-3 个空格的缩进行（会被原样显出来），已确认没有。 */
-.prose p { white-space: pre-wrap; }
+   前提是正文里没有 1-3 个空格的缩进行（会被原样显出来），已确认没有。
+   只挂在 .preserve-breaks 下：关于页这类手写 HTML 段落也用 .prose，
+   源码里的软换行若被当真换行，排版就散了。 */
+.prose.preserve-breaks p { white-space: pre-wrap; }
 
 .prose img { max-width: 100%; height: auto; border-radius: 10px; }
 .prose pre {

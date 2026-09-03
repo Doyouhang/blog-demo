@@ -104,7 +104,7 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
       </>
     )}
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-    <div class="prose" style="margin-top:18px"><Content /></div>
+    <div class="prose preserve-breaks" style="margin-top:18px"><Content /></div>
 
     {(newer || older) && (
       <nav class="post-nav" aria-label="文章导航">
