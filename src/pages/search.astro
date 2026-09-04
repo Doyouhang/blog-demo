@@ -134,7 +134,7 @@ import Icon from '../components/Icon.astro';
         const hits: Hit[] = await Promise.all(r.results.slice(0, 20).map((x: any) => x.data()));
         if (mine !== seq) return;
 
-        state.textContent = hits.length ? `找到 ${r.results.length} 条` : '没有匹配的内容。';
+        state.textContent = hits.length ? `找到 ${r.results.length} 条` : '无此条目。换个词试试。';
         box.innerHTML = hits
           .map(
             (h) => `<a class="hit" href="${h.url}">

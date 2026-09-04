@@ -158,7 +158,7 @@ body {
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a:hover { text-decoration: underline; text-decoration-color: var(--seal); }
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -686,6 +686,56 @@ footer.site {
 .int-cell b { transition: color var(--dur-fast) var(--ease); }
 .int-cell:hover b { color: var(--hover-ink); }
 
+/* ----- 滚动条：朱红细条，基础设施级淡存在 ----- */
+:root { --seal-soft: rgba(191, 59, 43, 0.55); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --seal-soft: rgba(207, 87, 65, 0.55); }
+}
+:root[data-theme='dark'] { --seal-soft: rgba(207, 87, 65, 0.55); }
+html { scrollbar-color: var(--seal-soft) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--seal-soft); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--seal); }
+
+/* ----- 读到底落「阅」印 ----- */
+.read-progress { overflow: visible; }
+.read-seal {
+  position: absolute; right: 10px; top: 7px;
+  width: 18px; height: 18px; border-radius: 4px;
+  background: var(--seal); color: var(--seal-fg);
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: rotate(-30deg) scale(1.6);
+}
+/* stamp-in 末帧不写 opacity，fill 结束会落回基础值 —— 这里基础值必须是 1 */
+.read-progress.done .read-seal { opacity: 1; animation: stamp-in var(--dur-slow) var(--ease-spring) both; }
+
+/* ----- 主题切换圆形展开：只在自己的仪式里关掉默认淡入，
+     不影响 ClientRouter 的换页转场 ----- */
+html.theme-reveal::view-transition-old(root) { display: none; }
+html.theme-reveal::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* ----- 首页「最后归档」元数据 / 空状态提示行 ----- */
+.intro-meta {
+  margin: 10px 0 0; font-family: var(--font-mono);
+  font-size: 12px; color: var(--muted); letter-spacing: 0.04em;
+}
+.empty-hint { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+/* ----- 卷首：首条长文拿封面级层级（排版给，不造假封面） ----- */
+.post-card.featured { padding: 30px 0 24px; }
+.post-card.featured h3 { font-size: 28px; line-height: 1.35; margin: 0 0 10px; }
+.post-card.featured p { font-size: 15.5px; }
+.feat-eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
+  color: var(--muted); margin-bottom: 12px;
+  transition: color var(--dur-fast) var(--ease);
+}
+.feat-dot { width: 8px; height: 8px; background: var(--seal); border-radius: 2px; transform: rotate(45deg); }
+.post-card.featured:hover .feat-eyebrow { color: var(--hover-ink); }
+
 .colophon-word {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700;
   letter-spacing: 0.18em; text-transform: uppercase; margin-right: 8px;
@@ -734,10 +784,15 @@ article h1 { font-size: 32px; }
   font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 1;
   transform: rotate(-3deg);
   box-shadow: inset 0 0 0 1.5px rgba(247, 244, 236, 0.28);
-  transition: transform var(--dur) var(--ease-spring);
+  transition: transform var(--dur) var(--ease-spring), box-shadow var(--dur-fast) var(--ease);
   user-select: none; flex-shrink: 0;
 }
-a:hover > .seal, .seal:hover { transform: rotate(0deg) scale(1.05); }
+/* 悬停按压感：描边加深、字微沉 —— 像把橡皮章按得更实 */
+a:hover > .seal, .seal:hover {
+  transform: rotate(0deg) scale(1.05);
+  box-shadow: inset 0 0 0 2.5px rgba(247, 244, 236, 0.42);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
 .seal-sm { width: 22px; height: 22px; font-size: 13px; border-radius: 4px; vertical-align: -6px; margin-right: 8px; }
 
 /* 首页大头像 → 大印章 */

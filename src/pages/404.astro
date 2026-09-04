@@ -1,16 +1,29 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import PageHeader from '../components/PageHeader.astro';
 const B = import.meta.env.BASE_URL;
 ---
 <BaseLayout title="页面不存在" description="你要找的页面不存在" fullWidth noIndex>
-  <div class="container-wide">
-    <PageHeader eyebrow="404" title="这个页面走丢了" lead="链接可能拼错了，或者内容已经挪走。">
-      <div class="head-actions">
-        <a class="btn-primary" href={`${B}`}>回到首页</a>
-        <a class="btn-quiet" href={`${B}blog/`}>看看博客</a>
-        <a class="btn-quiet" href={`${B}interests/`}>逛逛兴趣</a>
-      </div>
-    </PageHeader>
+  <div class="lost">
+    <div class="lost-stamp" aria-hidden="true">查无此档</div>
+    <p class="lost-note">这页还没归档到档柜里。</p>
+    <a class="lost-back" href={`${B}`}>← 回到封面</a>
   </div>
+
+  <style>
+    .lost {
+      min-height: 62vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px; padding: 40px 20px;
+    }
+    /* 双线框大印章，入场复用 stamp-in 盖一下 */
+    .lost-stamp {
+      font-family: var(--font-display); font-weight: 700;
+      font-size: clamp(28px, 6vw, 44px); letter-spacing: 0.14em;
+      color: var(--seal); border: 3px solid var(--seal); border-radius: 10px;
+      padding: 16px 30px; transform: rotate(-3deg);
+      box-shadow: inset 0 0 0 4px var(--bg), inset 0 0 0 5.5px var(--seal);
+      animation: stamp-in var(--dur-slow) var(--ease-spring) both;
+    }
+    .lost-note { margin: 0; color: var(--muted); font-size: 14px; }
+    .lost-back { font-size: 14px; }
+  </style>
 </BaseLayout>

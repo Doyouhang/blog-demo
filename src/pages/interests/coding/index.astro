@@ -36,10 +36,7 @@ const topTags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
   <div class="split">
     <div class="split-main">
       {posts.length === 0 ? (
-        <p class="empty">
-          还没有技术文章。写一篇 <code>topic: coding</code> 的长文就会出现在这里，
-          填上 <code>repo</code> 字段还会在右边列出仓库。
-        </p>
+        <p class="empty">暂未入档。<span class="empty-hint">还没有技术文章。写一篇 <code>topic: coding</code> 的长文就会出现在这里， 填上 <code>repo</code> 字段还会在右边列出仓库。</span></p>
       ) : (
         posts.map((p) => <EssayCard post={p} />)
       )}

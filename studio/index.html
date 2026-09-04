@@ -20,8 +20,8 @@
   @media (prefers-color-scheme: dark) {
     :root {
       color-scheme: dark;
-      --bg: #1a1c20; --panel: #20232a; --fg: #e6e2d8; --muted: #9b968a; --danger: #e0705c;
-      --border: #383b40; --accent: #a9bedf; --accent-fg: #1a1c20; --accent-weak: rgba(169, 190, 223, 0.14);
+      --bg: #1b1815; --panel: #221f1b; --fg: #ece5d4; --muted: #a39c8c; --danger: #e0705c;
+      --border: #3d382f; --accent: #a9bedf; --accent-fg: #1b1815; --accent-weak: rgba(169, 190, 223, 0.14);
       --warn-bg: rgba(224, 166, 66, 0.12); --warn-fg: #e4b568; --warn-border: rgba(224, 166, 66, 0.34);
       --ok: #6fbf97; --seal: #cf5741;
     }
@@ -50,6 +50,11 @@
     font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1;
     transform: rotate(-3deg);
     box-shadow: inset 0 0 0 1.5px rgba(247, 244, 236, 0.28);
+    transition: box-shadow var(--dur-fast) var(--ease);
+  }
+  .brand:hover .seal {
+    box-shadow: inset 0 0 0 2.5px rgba(247, 244, 236, 0.42);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   }
   .types { padding: 10px; display: flex; gap: 6px; }
   .types button {

@@ -9,7 +9,7 @@ import { interests } from '../data/interests';
 import { AUTHOR } from '../consts';
 import nowData from '../data/now.json';
 import stockData from '../data/stocks.json';
-import { cstISODate } from '../utils/cst';
+import { cstISODate, cstTime } from '../utils/cst';
 
 const B = import.meta.env.BASE_URL;
 
@@ -98,6 +98,11 @@ const sign = (n: number) => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
       <div class="intro-text">
         <h1>你好，我是{AUTHOR}</h1>
         <p>白天当牛马，晚上折腾些没用但有趣的东西。</p>
+        {nowAt && (
+          <p class="intro-meta">
+            最后归档 · {cstISODate(new Date(nowAt))}{cstTime(new Date(nowAt)) ? ` ${cstTime(new Date(nowAt))}` : ''}
+          </p>
+        )}
       </div>
       <div class="intro-links">
         <a href="https://github.com/Doyouhang"><Icon name="github" size={16} />GitHub</a>

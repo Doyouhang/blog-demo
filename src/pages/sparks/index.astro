@@ -39,7 +39,7 @@ const span = years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : Str
     />
 
     {all.length === 0 ? (
-      <p class="empty">还没有记录。在 <code>src/content/sparks/</code> 下新建一个 md 就行。</p>
+      <p class="empty">无新录。<span class="empty-hint">还没有记录。在 <code>src/content/sparks/</code> 下新建一个 md 就行。</span></p>
     ) : (
       <div class="stream">
         {[...groups].map(([month, list]) => (

@@ -26,7 +26,7 @@ const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
       </div>
 
       {songs.length === 0 ? (
-        <p class="empty">歌单还是空的。在 <code>src/content/items/</code> 加一个 <code>kind: song</code> 的文件即可。</p>
+        <p class="empty">暂未入档。<span class="empty-hint">歌单还是空的。在 <code>src/content/items/</code> 加一个 <code>kind: song</code> 的文件即可。</span></p>
       ) : (
         songs.map((s) => <ItemCard item={s} essayHref={hrefOf(s.data.essay?.id)} />)
       )}

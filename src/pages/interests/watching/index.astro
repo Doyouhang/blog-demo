@@ -37,7 +37,7 @@ const hrefOf = (id?: string) => (id ? `${B}blog/${id}/` : undefined);
   <div class="split">
     <div class="split-main">
       {movies.length === 0 ? (
-        <p class="empty">片单还是空的。在 <code>src/content/items/</code> 加一个 <code>kind: movie</code> 的文件即可。</p>
+        <p class="empty">暂未入档。<span class="empty-hint">片单还是空的。在 <code>src/content/items/</code> 加一个 <code>kind: movie</code> 的文件即可。</span></p>
       ) : (
         shelf.map((s) => (
           <section class="shelf">

@@ -180,6 +180,8 @@ ok('死循环被超时中止且页面存活', aliveAfterLoop);
 
 // 7. 主题切换 + 跨页保持
 await page.click('#theme-toggle');
+// 圆形展开把主题应用移进 view-transition 回调（异步一帧），等它落上再读
+await page.waitForFunction(() => document.documentElement.dataset.theme != null, null, { timeout: 3000 });
 const themeAfterToggle = await page.getAttribute('html', 'data-theme');
 await page.click(`.nav-links a[href="${at('/blog/')}"]`);
 await page.waitForSelector('h1:has-text("博客")');
@@ -338,6 +340,10 @@ if (pickerState === 'has-button') {
   }
   await probe.close();
 }
+
+// 404 的反向签名时刻：撞墙也要撞出品牌
+const nf = await probe.goto(BASE + '/no-such-page/', { waitUntil: 'domcontentloaded' });
+ok('404 是「查无此档」', nf.status() === 404 && (await probe.textContent('body')).includes('查无此档'));
 
 await page.goto(BASE + '/interests/stocks/', { waitUntil: 'networkidle' });
 await page.screenshot({ path: '/tmp/shot-light.png', fullPage: true });
