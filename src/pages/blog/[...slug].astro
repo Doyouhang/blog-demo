@@ -110,7 +110,7 @@ const older = index < posts.length - 1 ? posts[index + 1] : undefined;
 
     // 读到底，进度条尾端落一枚「阅」印 —— 阅读=盖印的收尾
     function initReadSeal() {
-      const bar = document.querySelector('.read-progress');
+      const bar = document.querySelector<HTMLElement>('.read-progress');
       if (!bar || !markReady(bar)) return;
       const atEnd = () =>
         window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
