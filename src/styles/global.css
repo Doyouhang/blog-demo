@@ -661,6 +661,8 @@ footer.site {
   transition: background var(--dur) var(--ease);
 }
 .post-card:hover::after { background: var(--hover-bg); }
+/* 首条无上内边距，滑块顶边贴齐卡片顶，日期才包得进去 */
+.post-card:first-of-type::after { top: 0; }
 .post-card .post-date { transition: color var(--dur-fast) var(--ease); }
 .post-card:hover .post-date { color: var(--hover-ink); }
 
