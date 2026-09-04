@@ -338,12 +338,12 @@ if (pickerState === 'has-button') {
     const r = await probe.goto(BASE + gone, { waitUntil: 'domcontentloaded' });
     ok(`${gone} 已移除`, r.status() === 404, String(r.status()));
   }
+  // 404 的反向签名时刻：撞墙也要撞出品牌。
+  // 和上面那两条共用同一个 probe —— 走主 page 也一样会把 404 记成 JS 报错。
+  const nf = await probe.goto(BASE + '/no-such-page/', { waitUntil: 'domcontentloaded' });
+  ok('404 是「查无此档」', nf.status() === 404 && (await probe.textContent('body')).includes('查无此档'));
   await probe.close();
 }
-
-// 404 的反向签名时刻：撞墙也要撞出品牌
-const nf = await probe.goto(BASE + '/no-such-page/', { waitUntil: 'domcontentloaded' });
-ok('404 是「查无此档」', nf.status() === 404 && (await probe.textContent('body')).includes('查无此档'));
 
 await page.goto(BASE + '/interests/stocks/', { waitUntil: 'networkidle' });
 await page.screenshot({ path: '/tmp/shot-light.png', fullPage: true });
@@ -356,10 +356,19 @@ await mobile.screenshot({ path: '/tmp/shot-mobile.png', fullPage: true });
 const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
 ok('375px 窄屏无横向溢出', !overflow);
 
-// 二次进入同一 demo（模块已执行过）仍要立刻可用
+// 二次进入同一 demo（模块已执行过）仍要可用。
+//
+// 真正的失败模式是「模块执行过就不再重新初始化」—— 那样 data-ready 永远不出现，
+// 等多久都等不到。所以这里等一个宽裕的窗口，超时就算挂。
+// 原来写死 200ms，把「有没有重新初始化」和「机器有多快」捆在了一起：
+// 本机实测（静态资源已缓存）稳定在 240ms 上下，CI 机器不会比本机更快，
+// 于是机器一慢就红灯，而真正的 bug 并不会因此更容易被抓到。
+// 因此改成：等 3s，同时把耗时打进结果里 —— 真变慢了看得见，但不再误杀。
 await page.goto(BASE + '/interests/', { waitUntil: 'networkidle' });
+const tReady = Date.now();
 await page.click(`a[href="${at('/interests/music/')}"]`);
-await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 200, state: 'attached' });
+await page.waitForSelector('.mini-piano[data-ready="1"]', { timeout: 3000, state: 'attached' });
+const reenterMs = Date.now() - tReady;
 await page.click('details.lab summary');
 await waitInteractive(page, '.piano-keys .key.white');
 const b2 = await page.locator('.piano-keys .key.white').first().boundingBox();
@@ -368,7 +377,7 @@ await page.mouse.down();
 const again = await page.evaluate(() =>
   document.querySelector('.piano-keys .key.white')?.classList.contains('active') ?? false);
 await page.mouse.up();
-ok('二次进入 demo 同样可用', again);
+ok('二次进入 demo 同样可用', again, `${reenterMs}ms 内重新就绪`);
 
 // 反复进出不会重复绑定（一次按下只应播一个音）
 const bindCount = await page.evaluate(() => {
@@ -407,9 +416,19 @@ await page.waitForFunction(() => !document.getElementById('q')?.disabled, null, 
 ok('搜索索引加载成功', true);
 
 const doSearch = async (q) => {
+  // 结果是异步渲染的：160ms 防抖 + wasm 搜索 + 逐条拉 fragment，全程没有事件可订阅。
+  // 先清掉上一轮的 state / 结果再输入，然后等 state 落到终态（非空且不是「搜索中…」）——
+  // 原来写死 500ms，慢机器上永远等不到，和「机器速度耦合」是同一类病
+  await page.evaluate(() => {
+    const s = document.getElementById('state'); const b = document.getElementById('results');
+    if (s) s.textContent = ''; if (b) b.innerHTML = '';
+  });
   await page.fill('#q', '');
   await page.fill('#q', q);
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => {
+    const s = document.getElementById('state')?.textContent ?? '';
+    return s !== '' && s !== '搜索中…';
+  }, null, { timeout: 8000 });
   return page.evaluate(() => [...document.querySelectorAll('.hit')].map((a) => a.getAttribute('href')));
 };
 
@@ -449,9 +468,10 @@ if (zhWord) {
 }
 
 // 注意：中文是按词切分的，搜一个长句会匹配到包含其中多数词的页面，那是预期行为。
-// 要测「无结果」分支得用真正不存在的字串。
+// 要测「无结果」分支得用真正不存在的字串。空状态文案是档案语态的「无此条目」——
+// 空状态改版时这条要跟着改。
 const rNone = await doSearch('zzzzqqqq');
-ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('没有'));
+ok('无结果时给提示', rNone.length === 0 && (await page.locator('#state').textContent()).includes('无此条目'));
 
 // 段落里的硬换行要留住。笔记类文章靠换行断句，Markdown 默认把段落内的单个换行
 // 折成空格 —— 奥德赛那 26 行引文会塌成一整段，而构建、控制台、状态码全是正常的。

@@ -42,6 +42,10 @@ async function collectSerifText() {
     '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ ',
     '，。、；：？！…—·《》〈〉「」『』【】（）＊＃＆％＋－／＝～￥',
     '迩',                                              // 朱红印章
+    // 印章类元素（读毕「阅」印、「查无此档」大印）是写在 astro 模板里的 span/div，
+    // 不在 <p> 也不是带引号的字符串字面量 —— 7f8d288 加「阅」印时就是从这里漏的，
+    // 冒烟测试「衬线子集没漏字」当场抓了出来
+    grab(/<(?:span|div)[^>]*class="[^"]*(?:seal|stamp)[^"]*"[^>]*>([^<]{1,60})<\/(?:span|div)>/g),
     grab(/^#{1,3} (.+)$/gm),                           // md 一到三级标题
     grab(/^> ?(.*)$/gm),                               // md 引用块（走衬线）
     grab(/^title: (.+)$/gm),                           // frontmatter 标题
